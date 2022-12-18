@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
     // get close radius from args
     int closeRadius = atoi(argv[6]) - 1;
     if ((closeRadius < 0) || (closeRadius >= size))
-        closeRadius = size / 10;  // I choose this value randomly
+        closeRadius = size / 5;  // I chose this value randomly
 
     // if the random seed is given from the command line arguments
     int randomSeed;

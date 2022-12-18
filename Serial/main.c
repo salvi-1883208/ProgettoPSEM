@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 /*
 Place seed (center?)
 
@@ -28,11 +29,34 @@ void printGrid(int size, int **grid) {
 }
 
 int main(int argc, char *argv[]) {
+    // command line input: grid size, number of particles, number of steps, seed coordinates, random seed
+    if ((argc - 1) < 5) {
+        printf("Arguments are: square grid size, number of particles, number of maximum steps, seed coordinates, seed for the rand() function.\n");
+        return -1;
+    }
+    // time execution start
+    clock_t start = clock();
+
     // get grid size from args
     int size = atoi(argv[1]);
 
     // get number of particles sent from args
     int particles = atoi(argv[2]);
+
+    // get number of iterations for each particle from args
+    int iterations = atoi(argv[3]);
+
+    // get seed coordinates from args
+    int si = atoi(argv[4]) - 1;
+    int sj = atoi(argv[5]) - 1;
+
+    // if the random seed is given from the command line arguments
+    int randomSeed;
+    if (argc == 7)
+        // get seed for the rand() function from args
+        randomSeed = atoi(argv[6]);
+    else
+        randomSeed = 3521;
 
     // allocate the grid
     int **grid;
@@ -40,10 +64,19 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < size; i++)
         grid[i] = (int *)malloc(sizeof(int) * size);
 
-    // place seed in the middle
-    grid[(size - 1) / 2][(size - 1) / 2] = 2;
+    // if given out image coordinates place seed in the middle
+    if (si < 0 || sj < 0 || si > size || sj > size) {
+        printf("Given outside of image seed coordinates.\n");
+        printf("Setting seed coordinates to %d, %d.\n", size / 2, size / 2);
+        grid[(size - 1) / 2][(size - 1) / 2] = 2;
+    } else
+        grid[si][sj] = 2;
 
-    srand(3521);  // the seed for the rand() function
+    // set the seed for the rand() function
+    srand(randomSeed);
+
+    // conunter for the culled particles
+    int culled = 0;
 
     // send particles number of particles
     for (int x = 0; x < particles; x++) {
@@ -60,7 +93,10 @@ int main(int argc, char *argv[]) {
         // the generated particle is not stuck
         bool stuck = false;
 
-        // if the particle has been generated close to a stuck one do not move
+        // the number of moves a particle did
+        int steps = 0;
+
+        // if the particle has been generated close to a stuck one do not move it
         for (int g = -1; g <= 1; g++)
             for (int k = -1; k <= 1; k++) {
                 if (i + g < 0 || i + g >= size || j + k < 0 || j + k >= size)
@@ -69,9 +105,12 @@ int main(int argc, char *argv[]) {
             }
 
         // while the particle is not stuck move randomly
-        while (!stuck) {
+        while (!stuck && ((steps < iterations) || (iterations == 0))) {
             // generate move
             int m = rand() % (8);
+
+            // increment number of steps done
+            steps++;
 
             // if the particle is on one of the edges
             if ((i <= 0 && (m <= 3)) ||                          // top
@@ -125,10 +164,24 @@ int main(int argc, char *argv[]) {
                     stuck |= grid[i + g][j + k] != 0;
                 }
         }
-        // place the stuck particle in the grid
-        grid[i][j] = 1;
+
+        // if the particle finished before doing more than iterations steps
+        if ((steps < iterations) || (iterations == 0))
+            // place the stuck particle in the grid
+            grid[i][j] = 1;
+        // if the particle was culled increment counter
+        else if (steps >= iterations)
+            culled++;
+
+        // if a particle did more than iteration steps it is culled
     }
 
+    printf("Culled %d particles.\n", culled);
+
+    // end time
+    clock_t end = clock();
+
+    // save image to .ppm file
     int i, j;
     FILE *fp = fopen("out.ppm", "wb"); /* b - binary mode */
     (void)fprintf(fp, "P6\n%d %d\n255\n", size, size);
@@ -158,4 +211,10 @@ int main(int argc, char *argv[]) {
     (void)fclose(fp);
 
     // printGrid(size, grid);
+
+    // print CPU time of main function
+    printf("CPU time in seconds: %f\n",
+           (double)(end - start) / (CLOCKS_PER_SEC));
+
+    return 0;
 }

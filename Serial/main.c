@@ -28,10 +28,43 @@ void printGrid(int size, int **grid) {
     printf("\n");
 }
 
+void moveParticle(int *i, int *j, int m) {
+    switch (m) {
+        case 0:  // top left
+            (*j)--;
+            (*i)--;
+            break;
+        case 1:  // top
+            (*i)--;
+            break;
+        case 2:  // top right
+            (*i)--;
+            (*j)++;
+            break;
+        case 3:  // left
+            (*j)--;
+            break;
+        case 4:  // right
+            (*j)++;
+            break;
+        case 5:  // bottom left
+            (*j)--;
+            (*i)++;
+            break;
+        case 6:  // bottom
+            (*i)++;
+            break;
+        case 7:  // bottom right
+            (*i)++;
+            (*j)++;
+            break;
+    }
+}
+
 int main(int argc, char *argv[]) {
-    // command line input: grid size, number of particles, number of steps, seed coordinates, random seed
-    if ((argc - 1) < 5) {
-        printf("Arguments are: square grid size, number of particles, number of maximum steps, seed coordinates, seed for the rand() function.\n");
+    // command line input: grid size, number of particles, number of steps, seed coordinates, close radius, random seed
+    if ((argc - 1) < 6) {
+        printf("Arguments are: square grid size, number of particles, number of maximum steps, seed coordinates, radius for a point to be consedered close to the stuck structure, seed for the rand() function.\n");
         return -1;
     }
     // time execution start
@@ -50,9 +83,14 @@ int main(int argc, char *argv[]) {
     int si = atoi(argv[4]) - 1;
     int sj = atoi(argv[5]) - 1;
 
+    // get close radius from args
+    int closeRadius = atoi(argv[6]) - 1;
+    if ((closeRadius < 0) || (closeRadius >= size))
+        closeRadius = size / 5;  // I chose this value randomly
+
     // if the random seed is given from the command line arguments
     int randomSeed;
-    if (argc == 7)
+    if (argc == 8)
         // get seed for the rand() function from args
         randomSeed = atoi(argv[6]);
     else
@@ -68,9 +106,18 @@ int main(int argc, char *argv[]) {
     if (si < 0 || sj < 0 || si > size || sj > size) {
         printf("Given outside of image seed coordinates.\n");
         printf("Setting seed coordinates to %d, %d.\n", size / 2, size / 2);
-        grid[(size - 1) / 2][(size - 1) / 2] = 2;
-    } else
-        grid[si][sj] = 2;
+        si = (size - 1) / 2;
+        sj = (size - 1) / 2;
+    }
+
+    // set close particles in the grid to 3
+    for (int i = -closeRadius; i <= closeRadius; i++)
+        for (int j = -closeRadius; j <= closeRadius; j++)
+            if (!((i + si < 0) || (j + sj < 0) || (i + si >= size) || (j + sj >= size)))
+                grid[si + i][sj + j] = 3;
+
+    // place seed
+    grid[si][sj] = 2;
 
     // set the seed for the rand() function
     srand(randomSeed);
@@ -85,8 +132,14 @@ int main(int argc, char *argv[]) {
         int j = rand() % (size);
 
         // if the particle has been generated on an already stuck particle
-        if (grid[i][j] != 0) {
+        if ((grid[i][j] == 1) || (grid[i][j] == 2)) {
             // x--; // if commented skip this particle, if not generate new coordinates
+            continue;
+        }
+
+        // if generated particle is not close to the stuck structure generate new coordinates
+        if ((grid[i][j] != 3)) {
+            x--;
             continue;
         }
 
@@ -97,14 +150,23 @@ int main(int argc, char *argv[]) {
         int steps = 0;
 
         // if the particle has been generated close to a stuck one do not move it
-        for (int g = -1; g <= 1; g++)
+        for (int g = -1; g <= 1; g++) {
             for (int k = -1; k <= 1; k++) {
+                // don't check the neighbour cells that go outside of the image
                 if (i + g < 0 || i + g >= size || j + k < 0 || j + k >= size)
                     continue;
-                stuck |= grid[i + g][j + k] != 0;
+                // if close one is stuck it becomes stuck
+                if ((grid[i + g][j + k] == 1) || (grid[i + g][j + k] == 2)) {
+                    stuck = true;
+                    break;
+                }
             }
+            if (stuck)
+                break;
+        }
 
-        // while the particle is not stuck move randomly
+        // while the particle is not stuck and has not moved more than steps times,
+        // move randomly
         while (!stuck && ((steps < iterations) || (iterations == 0))) {
             // generate move
             int m = rand() % (8);
@@ -112,70 +174,65 @@ int main(int argc, char *argv[]) {
             // increment number of steps done
             steps++;
 
-            // if the particle is on one of the edges
-            if ((i <= 0 && (m <= 3)) ||                          // top
-                (i >= size - 1 && (m >= 5)) ||                   // bottom
-                (j <= 0 && (m == 0 || m == 3 || m == 5)) ||      // left
-                (j >= size - 1 && (m == 2 || m == 4 || m == 7))  // right
-            ) {
-                // teleport the particle randomly
-                int i = rand() % (size);
-                int j = rand() % (size);
-                continue;
-            }
+            // temp variables for checking if the movement is ok
+            int mi = i;
+            int mj = j;
 
             // move particle
-            switch (m) {
-                case 0:  // top left
-                    j--;
-                    i--;
-                    break;
-                case 1:  // top
-                    i--;
-                    break;
-                case 2:  // top right
-                    i--;
-                    j++;
-                    break;
-                case 3:  // left
-                    j--;
-                    break;
-                case 4:  // right
-                    j++;
-                    break;
-                case 5:  // bottom left
-                    j--;
-                    i++;
-                    break;
-                case 6:  // bottom
-                    i++;
-                    break;
-                case 7:  // bottom right
-                    i++;
-                    j++;
-                    break;
+            moveParticle(&mi, &mj, m);
+
+            // change the move if it is not ok until it is
+            while (true) {
+                // if the moved particle goes outside of the image
+                if (!((mi < 0) || (mj < 0) || (mi >= size) || (mj >= size)))
+                    // if the moved particle goes too far away from the structure
+                    if (!grid[mi][mj] == 0)
+                        break;
+                // generate new move
+                m = rand() % (8);
+                mi = i;
+                mj = j;
+                moveParticle(&mi, &mj, m);
             }
 
+            // move the particle
+            i = mi;
+            j = mj;
+
             // if the particle is close to a stuck particle it becomes stuck
-            for (int g = -1; g <= 1; g++)
+            for (int g = -1; g <= 1; g++) {
                 for (int k = -1; k <= 1; k++) {
                     if (i + g < 0 || i + g >= size || j + k < 0 || j + k >= size)
                         continue;
-                    stuck |= grid[i + g][j + k] != 0;
+                    if ((grid[i + g][j + k] == 1) || (grid[i + g][j + k] == 2)) {
+                        stuck = true;
+                        break;
+                    }
                 }
+                if (stuck)
+                    break;
+            }
         }
 
         // if the particle finished before doing more than iterations steps
-        if ((steps < iterations) || (iterations == 0))
+        if ((steps < iterations) || (iterations == 0)) {
+            // set close particles to 3
+            for (int a = -closeRadius; a <= closeRadius; a++)
+                for (int b = -closeRadius; b <= closeRadius; b++)
+                    if (!((i + a < 0) || (j + b < 0) || (i + a >= size) || (j + b >= size)))
+                        if ((grid[i + a][j + b] == 0))
+                            grid[i + a][j + b] = 3;
+
             // place the stuck particle in the grid
             grid[i][j] = 1;
-        // if the particle was culled increment counter
+        }  // else the particle was culled, so increment counter
         else if (steps >= iterations)
             culled++;
 
         // if a particle did more than iteration steps it is culled
     }
 
+    // print the number of culled particles
     printf("Culled %d particles.\n", culled);
 
     // end time
@@ -198,6 +255,11 @@ int main(int argc, char *argv[]) {
                     color[0] = 255; /* red */
                     color[1] = 0;   /* green */
                     color[2] = 0;   /* blue */
+                    break;
+                case 3:            // close to stuck structure
+                    color[0] = 0;  /* red */
+                    color[1] = 0;  /* green */
+                    color[2] = 96; /* blue */
                     break;
                 default:          // empty spots
                     color[0] = 0; /* red */

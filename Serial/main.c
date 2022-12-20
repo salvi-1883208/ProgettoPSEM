@@ -2,20 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+
+#define IMG_NAME "out.ppm"
 /*
-Place seed (center?)
-
-Start firing particles one at a time
-
-Particle moves randomly (8 possible moves)
-
-If a particle goes too far from the stuck structure
-(it is randomly placed from a distance from the structure?)
-(deleted?)
-
-If a particle comes close enough to a stuck particle it becomes stuck
-
-Repeat (when to stop?)
+TODO generate a new particle only on the edge of the close range
 */
 
 void printGrid(int size, int **grid) {
@@ -92,7 +82,7 @@ int main(int argc, char *argv[]) {
     int randomSeed;
     if (argc == 8)
         // get seed for the rand() function from args
-        randomSeed = atoi(argv[6]);
+        randomSeed = atoi(argv[7]);
     else
         randomSeed = 3521;
 
@@ -133,7 +123,7 @@ int main(int argc, char *argv[]) {
 
         // if the particle has been generated on an already stuck particle
         if ((grid[i][j] == 1) || (grid[i][j] == 2)) {
-            // x--; // if commented skip this particle, if not generate new coordinates
+            x--;
             continue;
         }
 
@@ -168,9 +158,6 @@ int main(int argc, char *argv[]) {
         // while the particle is not stuck and has not moved more than steps times,
         // move randomly
         while (!stuck && ((steps < iterations) || (iterations == 0))) {
-            // generate move
-            int m = rand() % (8);
-
             // increment number of steps done
             steps++;
 
@@ -178,8 +165,8 @@ int main(int argc, char *argv[]) {
             int mi = i;
             int mj = j;
 
-            // move particle
-            moveParticle(&mi, &mj, m);
+            // move particle with a random move
+            moveParticle(&mi, &mj, rand() % (8));
 
             // change the move if it is not ok until it is
             while (true) {
@@ -188,11 +175,10 @@ int main(int argc, char *argv[]) {
                     // if the moved particle goes too far away from the structure
                     if (!grid[mi][mj] == 0)
                         break;
-                // generate new move
-                m = rand() % (8);
+                // try moving the particle with a different move
                 mi = i;
                 mj = j;
-                moveParticle(&mi, &mj, m);
+                moveParticle(&mi, &mj, rand() % (8));
             }
 
             // move the particle
@@ -240,7 +226,7 @@ int main(int argc, char *argv[]) {
 
     // save image to .ppm file
     int i, j;
-    FILE *fp = fopen("out.ppm", "wb"); /* b - binary mode */
+    FILE *fp = fopen(IMG_NAME, "wb"); /* b - binary mode */
     (void)fprintf(fp, "P6\n%d %d\n255\n", size, size);
     for (i = 0; i < size; ++i) {
         for (j = 0; j < size; ++j) {
@@ -272,11 +258,11 @@ int main(int argc, char *argv[]) {
     }
     (void)fclose(fp);
 
-    // printGrid(size, grid);
-
     // print CPU time of main function
     printf("CPU time in seconds: %f\n",
            (double)(end - start) / (CLOCKS_PER_SEC));
+
+    printf("Saved image as %s\n", IMG_NAME);
 
     return 0;
 }

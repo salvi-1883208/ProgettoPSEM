@@ -9,16 +9,6 @@
 
 int gridSize;
 
-void printGrid(int size, int **grid) {
-    // print the grid
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++)
-            printf("%d    ", grid[i][j]);
-        printf("\n");
-    }
-    printf("\n");
-}
-
 void moveParticle(int *i, int *j, int m) {
     switch (m) {
         case 0:  // top left
@@ -53,75 +43,10 @@ void moveParticle(int *i, int *j, int m) {
 }
 
 // bound a particle inside the grid
-int bound(int a) {
-    if (a < 0)
-        return 0;
-    if (a >= gridSize)
-        return gridSize - 1;
-    return a;
-}
-
-// bound a particle inside the grid
 int boundI(int a) {
     if (a <= 0 || a >= gridSize - 1)
         return -1;
     return a;
-}
-
-// Implementing Mid-Point Circle Drawing Algorithm
-void drawCircle(int **grid, int i, int j, int radius, int color) {
-    int x = radius, y = 0;
-
-    // Printing the initial point on the axes
-    // after translation
-
-    grid[bound(x + i)][bound(y + j)] = color;
-    grid[bound(i)][bound(-x + j)] = color;
-    grid[bound(-x + i)][bound(j)] = color;
-
-    // When radius is zero only a single
-    // point will be printed
-    if (radius > 0) {
-        grid[bound(x + i)][bound(-y + j)] = color;
-        grid[bound(y + i)][bound(x + j)] = color;
-        grid[bound(-y + i)][bound(x + j)] = color;
-    }
-
-    // Initialising the value of P
-    int P = 1 - radius;
-    while (x > y) {
-        y++;
-
-        // Mid-point is inside or on the perimeter
-        if (P <= 0)
-            P = P + 2 * y + 1;
-
-        // Mid-point is outside the perimeter
-        else {
-            x--;
-            P = P + 2 * y - 2 * x + 1;
-        }
-
-        // All the perimeter points have already been printed
-        if (x < y)
-            break;
-
-        // Printing the generated point and its reflection
-        // in the other octants after translation
-        grid[bound(x + i)][bound(y + j)] = color;
-        grid[bound(-x + i)][bound(y + j)] = color;
-        grid[bound(x + i)][bound(-y + j)] = color;
-        grid[bound(-x + i)][bound(-y + j)] = color;
-
-        // If the generated point is on the line x = y then
-        // the perimeter points have already been printed
-        if (x != y) {
-            grid[bound(y + i)][bound(x + j)] = color;
-            grid[bound(-y + i)][bound(x + j)] = color;
-            grid[bound(y + i)][bound(-x + j)] = color;
-            grid[bound(-y + i)][bound(-x + j)] = color;
-        }
-    }
 }
 
 void saveImage(int **grid, int size) {
@@ -160,13 +85,13 @@ void saveImage(int **grid, int size) {
     (void)fclose(fp);
 }
 
-// generate a point with a distance radius from the center
-void generatePointInCircle(int *i, int *j, int ci, int cj, int radius) {
+// generate an array of points of a circle with ci, cj as center and radius radius
+int generateCircleFromCenter(int **out, int ci, int cj, int radius) {
     // allocte the array with the circle coordinates inside
     int size = 2 * ceil(3.14 * radius * 2);
     int *circle = malloc(sizeof(int) * size);
 
-    // initialize the array to a value outside the image
+    // initialize the array to a specific impossible value
     for (int k = 0; k < size; k++)
         circle[k] = -1;
 
@@ -248,6 +173,15 @@ void generatePointInCircle(int *i, int *j, int ci, int cj, int radius) {
             circle[++g] = boundI(-x + cj);
         }
     }
+    *out = circle;
+
+    return size;
+}
+
+void generatePointInCircle(int *i, int *j, int ci, int cj, int radius) {
+    // get the array of points of the circle and its size
+    int *circle = NULL;
+    int size = generateCircleFromCenter(&circle, ci, cj, radius);
 
     // counter generate a point size * 3 times if not ok
     int cont = 0;
@@ -279,6 +213,20 @@ void generatePointInCircle(int *i, int *j, int ci, int cj, int radius) {
         *i = circle[point];
         *j = circle[point + 1];
     }
+
+    // de-allocate the array
+    free(circle);
+}
+
+void drawCircleFromCenter(int **grid, int ci, int cj, int radius, int color) {
+    // get the array of points of the circle and its size
+    int *circle = NULL;
+    int size = generateCircleFromCenter(&circle, ci, cj, radius);
+
+    // draw the circle
+    for (int i = 0; i < size; i += 2)
+        if (circle[i] != -1 && circle[i + 1] != -1)
+            grid[circle[i]][circle[i + 1]] = color;
 
     // de-allocate the array
     free(circle);
@@ -334,7 +282,7 @@ int main(int argc, char *argv[]) {
     }
 
     // draw the first circle around the center
-    drawCircle(grid, si, sj, closeRadius, 3);
+    drawCircleFromCenter(grid, si, sj, closeRadius, 3);
 
     // place seed
     grid[si][sj] = 2;
@@ -432,7 +380,7 @@ int main(int argc, char *argv[]) {
         // if the particle finished before doing more than iterations steps
         if ((steps < iterations) || (iterations == 0)) {
             // delete the old circle
-            drawCircle(grid, si, sj, closeRadiusT, 0);
+            drawCircleFromCenter(grid, si, sj, closeRadiusT, 0);
 
             // increment radius
             float d = sqrt((j - sj) * (j - sj) + (i - si) * (i - si));
@@ -443,7 +391,7 @@ int main(int argc, char *argv[]) {
             }
 
             // draw the updated circle
-            drawCircle(grid, si, sj, closeRadiusT, 3);
+            drawCircleFromCenter(grid, si, sj, closeRadiusT, 3);
 
             // place the stuck particle in the grid
             grid[i][j] = 1;

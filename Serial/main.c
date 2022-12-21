@@ -6,9 +6,6 @@
 #include <unistd.h>
 
 #define IMG_NAME "out.ppm"
-/*
-TODO generate a new particle only on the edge of the close range
-*/
 
 int gridSize;
 
@@ -55,6 +52,7 @@ void moveParticle(int *i, int *j, int m) {
     }
 }
 
+// bound a particle inside the grid
 int bound(int a) {
     if (a < 0)
         return 0;
@@ -63,6 +61,7 @@ int bound(int a) {
     return a;
 }
 
+// bound a particle inside the grid
 int boundI(int a) {
     if (a <= 0 || a >= gridSize - 1)
         return -1;
@@ -144,15 +143,10 @@ void saveImage(int **grid, int size) {
                     color[1] = 0;   /* green */
                     color[2] = 0;   /* blue */
                     break;
-                case 3:             // circle close to stuck structure in
+                case 3:             // circle close to stuck structure
                     color[0] = 0;   /* red */
                     color[1] = 0;   /* green */
                     color[2] = 255; /* blue */
-                    break;
-                case 4:            // circle close to stuck structure out
-                    color[0] = 0;  /* red */
-                    color[1] = 96; /* green */
-                    color[2] = 0;  /* blue */
                     break;
                 default:          // empty spots
                     color[0] = 0; /* red */
@@ -166,14 +160,17 @@ void saveImage(int **grid, int size) {
     (void)fclose(fp);
 }
 
+// generate a point with a distance radius from the center
 void generatePointInCircle(int *i, int *j, int ci, int cj, int radius) {
     // allocte the array with the circle coordinates inside
     int size = 2 * ceil(3.14 * radius * 2);
     int *circle = malloc(sizeof(int) * size);
 
+    // initialize the array to a value outside the image
     for (int k = 0; k < size; k++)
         circle[k] = -1;
 
+    // counter for populating the array
     int g = 0;
 
     int x = radius, y = 0;
@@ -251,37 +248,40 @@ void generatePointInCircle(int *i, int *j, int ci, int cj, int radius) {
             circle[++g] = boundI(-x + cj);
         }
     }
-    // printf("\n");
-    // for (int l = 0; l < size; l += 2)
-    //     printf("%d, %d, %d\n", l, circle[l], circle[l + 1]);
-    // printf("\n");
 
-    // return;
+    // counter generate a point size * 3 times if not ok
     int cont = 0;
+
+    // generate a point from the arrray
     int point = rand() % size;
+
+    // the number generated needs to point to an even value wich contains the x coordinate
     if (point % 2 != 0)
         point--;
+
+    // if the generated point goes outside of the image or is from an index wich
+    // was not populated (the array is slightly bigger than the radius)
+    // generate a new point
     while ((circle[point] == -1 || circle[point + 1] == -1) && cont < size * 3) {
-        // printf("%d\n", point);
         cont++;
         point = rand() % size;
         if (point % 2 != 0)
             point--;
     }
-    if (circle[point] == -1 || circle[point + 1] == -1) {
-        // *i = rand() % 2 == 0 ? 1 : gridSize - 1;
-        // *j = rand() % 2 == 0 ? 1 : gridSize - 1;
 
-        // printf("E\n");
+    // if the point generated goes outside of the image
+    if (circle[point] == -1 || circle[point + 1] == -1) {
+        // generate a random point in the grid
         *i = rand() % (gridSize - 1);
         *j = rand() % (gridSize - 1);
     } else {
+        // if not output it
         *i = circle[point];
         *j = circle[point + 1];
     }
-    // printf("P %d, %d\n", point, size);
+
+    // de-allocate the array
     free(circle);
-    // printf("G %d, %d, %d\n", *i, *j, point);
 }
 
 int main(int argc, char *argv[]) {
@@ -345,15 +345,23 @@ int main(int argc, char *argv[]) {
     // conunter for the culled particles
     int culled = 0;
 
+    // counter for the max distance from a particle of the structure and the original seed
     int maxDistance = 0;
 
+    // counters for the average step and max step
+    int avg = 0;
+    int maxStep = 0;
+
+    // temp variable used to increment the radius during the execution
     int closeRadiusT = closeRadius;
+
+    printf("\nSimulating growth...\n");
+
     // send particles number of particles
     for (int x = 0; x < particles; x++) {
         // generate random position at distance from center
         int i, j;
         generatePointInCircle(&i, &j, si, sj, closeRadiusT - 2);
-        // printf("G %d, %d\n", i, j);
 
         // if the particle has been generated on an already stuck particle
         if ((grid[i][j] == 1) || (grid[i][j] == 2)) {
@@ -367,12 +375,12 @@ int main(int argc, char *argv[]) {
         // the number of moves a particle did
         int steps = 0;
 
+        // the move to do
         int m;
 
         // while the particle is not stuck and has not moved more than steps times,
         // move randomly
         while (!stuck && ((steps < iterations) || (iterations == 0))) {
-            // printf("A\n");
             // increment number of steps done
             steps++;
 
@@ -385,46 +393,22 @@ int main(int argc, char *argv[]) {
             moveParticle(&mi, &mj, m);
 
             // change the move if it is not ok until it is
-            // printf("O %d, %d, %d\n", i, j, m);
-            // printf("M %d, %d, %d\n", mi, mj, m);
-
             while (true) {
-                // if the moved particle doesn't go outside of the image
-                // printf("O2 %d, %d, %d\n", i, j, m);
-                // printf("M2 %d, %d, %d\n", mi, mj, m);
-                // if (sqrt(((j - sj) * (j - sj)) + ((i - si) * (i - si))) >= closeRadiusT ||
-                //     mi < 0 || mj < 0) {
-                //     printf("O3 %d, %d, %d\n", i, j, m);
-                //     printf("M3 %d, %d, %d\n", mi, mj, m);
-                //     grid[mi][mj] = 2;
-                //     grid[i][j] = 4;
-                //     saveImage(grid, gridSize);
-                //     return -1;
-                // }
-                if (!((mi < 0) || (mj < 0) || (mi >= gridSize) || (mj >= gridSize))) {
-                    // printf("B\n");
+                if (!((mi < 0) || (mj < 0) || (mi >= gridSize) || (mj >= gridSize)))
                     // if the moved particle doesn't go on the circle
-                    if (!(grid[mi][mj] == 3)) {
-                        // printf("B1\n");
-
-                        // 0 2 5 7
+                    if (!(grid[mi][mj] == 3))
                         // if the moved particle doesn't go through the circle
                         if (!(m == 0 && grid[i - 1][j] == 3 && grid[i][j - 1] == 3) &&
                             !(m == 5 && grid[i + 1][j] == 3 && grid[i][j - 1] == 3) &&
                             !(m == 2 && grid[i - 1][j] == 3 && grid[i][j + 1] == 3) &&
-                            !(m == 7 && grid[i + 1][j] == 3 && grid[i][j + 1] == 3)) {
-                            // printf("B2\n");
-                            break;
-                        }
-                    }
-                }
+                            !(m == 7 && grid[i + 1][j] == 3 && grid[i][j + 1] == 3)) break;
+
                 // try moving the particle with a different move
                 mi = i;
                 mj = j;
                 m = rand() % (8);
                 moveParticle(&mi, &mj, m);
             }
-            // printf("C\n");
 
             // move the particle
             i = mi;
@@ -449,28 +433,25 @@ int main(int argc, char *argv[]) {
         if ((steps < iterations) || (iterations == 0)) {
             // delete the old circle
             drawCircle(grid, si, sj, closeRadiusT, 0);
-            // printf("B %d, %d,\n", i, j);
 
             // increment radius
             float d = sqrt((j - sj) * (j - sj) + (i - si) * (i - si));
             int dist = ceil(d);
-            // printf("D %d, %d, %d, %d\n", dist, maxDistance, closeRadiusT, closeRadius);
             if (dist > maxDistance) {
                 closeRadiusT = dist + closeRadius;
                 maxDistance = dist;
             }
 
-            // draw the update circle
+            // draw the updated circle
             drawCircle(grid, si, sj, closeRadiusT, 3);
 
             // place the stuck particle in the grid
             grid[i][j] = 1;
 
-            // if (x % 20 == 0)
-            //     saveImage(grid, gridSize);
-
-            // sleep(1);
-
+            // calculate avg and max steps
+            avg += steps;
+            if (steps > maxStep)
+                maxStep = steps;
         }  // else the particle was culled, so increment counter
         else if (steps >= iterations)
             culled++;
@@ -478,8 +459,14 @@ int main(int argc, char *argv[]) {
         // if a particle did more than iteration steps it is culled
     }
 
+    printf("Simulation finished.\n\n");
+
     // print the number of culled particles
-    printf("Culled %d particles.\n", culled);
+    printf("Of %d particles:\n - drawn %d,\n - culled %d.\n\n", particles, particles - culled, culled);
+
+    avg = round(avg / (particles - culled));
+    printf("Average particle steps %d.\n", avg);
+    printf("Max particle steps %d.\n", maxStep);
 
     // end time
     clock_t end = clock();

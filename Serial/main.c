@@ -7,6 +7,10 @@
 
 #define IMG_NAME "out.ppm"
 
+// TODO problem when the seed is too close to a border: some particles take A LOT of steps to find the stuck
+// structure, if i put a limit it works well enough, but without a limit it takes way longer than the same
+// configuration with the seed in the middle. why???
+
 int gridSize;
 
 void moveParticle(int *i, int *j, int m) {

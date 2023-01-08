@@ -383,6 +383,8 @@ int main(int argc, char *argv[]) {
 
         // if the particle finished before doing more than iterations steps
         if ((steps < iterations) || (iterations == 0)) {
+            // TODO draw the circles only if the maxdistance is updated?
+
             // delete the old circle
             drawCircleFromCenter(grid, si, sj, closeRadiusT, 0);
 

@@ -1,2 +1,4 @@
 Serial/out.ppm
 Serial/main
+cuda/main
+cuda/out.ppm

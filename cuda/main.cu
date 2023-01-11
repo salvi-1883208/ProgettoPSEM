@@ -6,11 +6,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define gridSize 701
+#define gridSize 300
 #define IMG_NAME "out.ppm"
 #define MAX_ITER 100000
-#define BLOCKS 16               // number of blocks
+#define BLOCKS 8                // number of blocks
 #define THREADS_PER_BLOCK 1024  // number of threads per block
+// BLOCKS * THREADS_PER_BLOCK = number of particles sent
 
 // move the particle in the random direction
 __device__ void move_particle(int* x, int* y, int m);
@@ -19,7 +20,7 @@ __device__ void move_particle(int* x, int* y, int m);
 int calc_over(int* grid, int size);
 
 // save the grid as a .ppm image
-int saveImage(int* grid, int size);
+void saveImage(int* grid, int size);
 
 // calculate the thread id
 __device__ int calc_id() {
@@ -56,11 +57,14 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state) {
     // print the starting position of the particle
     // printf("Thread (%d, %d) started (%d, %d)\n", blockIdx.x, id, x, y);
 
+    // initialize the counter for the number of iterations
+    int i = 0;
+
     // iterate until the particle is attached to the grid or it did more than MAX_ITER number of iterations
-    for (int i = 0; i < MAX_ITER; i++) {
+    while (i < MAX_ITER) {
         // if the particle not outside the grid &&
         // if the particle is close to an already stuck particle
-        if (!(y <= 0 || y >= (gridSize - 1) || x <= 0 || x >= (gridSize - 1)) &&  // in bounds
+        if (!(y <= 0 || y >= (gridSize - 1) || x <= 0 || x >= (gridSize - 1)) &&  // in bounds  (with this condition no particle will ever get stuck on a border, could be made so that it doesn't check outside of the grid )
             (grid[(y - 1) * gridSize + (x - 1)] > 0 ||                            // top left
              grid[(y - 1) * gridSize + x] > 0 ||                                  // top
              grid[(y - 1) * gridSize + (x + 1)] > 0 ||                            // top right
@@ -102,9 +106,13 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state) {
         // move the particle
         x = tempX;
         y = tempY;
+
+        // increment the number of iterations for each time the move is made
+        i++;
     }
 
     // if the particle did more than MAX_ITER number of iterations, skip it
+    // if I remove this it doesn't work, probably because of in warp divergence
     atomicAdd(skipped, 1);
 
     // printf("Thread (%d, %d) skipped\n", blockIdx.x, id);
@@ -150,6 +158,7 @@ int main(void) {
 
     int over = 0;
 
+    // this implementation ignores the overlapping particles and re-launches them until there are none
     do {  // launch the kernel to perform the dla algorithm
         dla_kernel<<<blocks, threads_per_block>>>(grid, skipped, d_state);
 
@@ -158,8 +167,6 @@ int main(void) {
 
         // get the number of overlapping particles
         over = calc_over(grid, gridSize);
-
-        printf("Overlapping: %d\n", over);
 
         // if there are more than 1024 overlapping particles
         if (over > 1024) {
@@ -195,12 +202,19 @@ int main(void) {
     return 0;
 }
 
+// calculate the number of overlapping particles
 int calc_over(int* grid, int size) {
+    // initialize the counter
     int tot = 0;
+
+    // iterate over the whole grid
     for (int i = 0; i < size; ++i)
         for (int j = 0; j < size; ++j)
+            // if the particle is overlapping
             if (grid[i * size + j] > 1) {
+                // increment the counter
                 tot++;
+                // set the particle as stuck and not overlapping anymore
                 grid[i * size + j] = 1;
             }
     return tot;
@@ -240,9 +254,9 @@ __device__ void move_particle(int* x, int* y, int m) {
     }
 }
 
-int saveImage(int* grid, int size) {
-    int count = 0;
+void saveImage(int* grid, int size) {
     // save image to .ppm file
+    int count = 0;
     int i, j;
     FILE* fp = fopen(IMG_NAME, "wb"); /* b - binary mode */
     (void)fprintf(fp, "P6\n%d %d\n255\n", size, size);
@@ -280,5 +294,5 @@ int saveImage(int* grid, int size) {
 
     printf("Saved image containing %d particles\n", count - 1);
 
-    return count;
+    return;
 }

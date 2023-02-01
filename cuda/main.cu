@@ -4,11 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define gridSize 400
+#define gridSize 500
 #define numParticles 8192
 #define blockSize 1024
 #define numBlocks (numParticles + blockSize - 1) / blockSize
-#define numSteps 10000
+#define numSteps 100000
 #define IMG_NAME "image.ppm"
 
 // kernel to set up the seed for each thread
@@ -19,14 +19,10 @@ __global__ void setup_kernel(curandState* state) {
 
 void saveImage(int* grid, int size);
 
+__global__ void diffuseAndCheckKernel(int* particlePositions, curandState* state, int* grid);
+
 // GPU kernel to generate initial positions of particles
 __global__ void generateParticlesKernel(int* particlePositions, int* grid, curandState* state);
-
-// GPU kernel to update the positions of the particles during diffusion
-__global__ void diffuseParticlesKernel(int* particlePositions, curandState* state);
-
-// GPU kernel to check if a particle has come into contact with the aggregate
-__global__ void checkContactKernel(int* particlePositions, int* grid);
 
 int main(int argc, char const* argv[]) {
     // allocate memory for the particles positions
@@ -53,20 +49,18 @@ int main(int argc, char const* argv[]) {
     // wait for the kernel to finish
     cudaDeviceSynchronize();
 
-    // time execution start
-    clock_t start = clock();
-
     // launch the kernel to generate the initial positions of the particles
     generateParticlesKernel<<<numBlocks, blockSize>>>(particles, grid, d_States);
 
     // wait for the kernel to finish
     cudaDeviceSynchronize();
 
+    // time execution start
+    clock_t start = clock();
+
     // launch the kernel to diffuse the particles
-    for (int i = 0; i < numSteps; i++) {
-        diffuseParticlesKernel<<<numBlocks, blockSize>>>(particles, d_States);
-        checkContactKernel<<<numBlocks, blockSize>>>(particles, grid);
-    }
+    for (int i = 0; i < numSteps; i++)
+        diffuseAndCheckKernel<<<numBlocks, blockSize>>>(particles, d_States, grid);
 
     // wait for the kernel to finish
     cudaDeviceSynchronize();
@@ -96,8 +90,8 @@ __global__ void generateParticlesKernel(int* particlePositions, int* grid, curan
     // Initialize the grid and place the seed point
     if (index < numParticles) {
         // Get the current position of the particle
-        int x = (int)particlePositions[2 * index];
-        int y = (int)particlePositions[2 * index + 1];
+        int x = particlePositions[2 * index];
+        int y = particlePositions[2 * index + 1];
 
         // Place the seed point randomly on the grid
         if (index == 0) {
@@ -119,8 +113,7 @@ __global__ void generateParticlesKernel(int* particlePositions, int* grid, curan
 
 __device__ void moveParticle(int* x, int* y, int m);
 
-// GPU kernel to update the positions of the particles during diffusion
-__global__ void diffuseParticlesKernel(int* particlePositions, curandState* state) {
+__global__ void diffuseAndCheckKernel(int* particlePositions, curandState* state, int* grid) {
     // Generate a unique index for each thread
     int index = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -133,52 +126,40 @@ __global__ void diffuseParticlesKernel(int* particlePositions, curandState* stat
         if (x == -1 && y == -1)
             return;
 
-        // Update the position using random walk
-        moveParticle(&x, &y, curand(&state[index]) % 8);
+        // Update the position using random walk (& 0b111 is equivalent to % 8)
+        moveParticle(&x, &y, curand(&state[index]) & 0b111);
 
         // Check if the particle is outside the grid
         if (x < 0)
             x = 0;
-        if (x >= gridSize)
+        else if (x >= gridSize)
             x = gridSize - 1;
         if (y < 0)
             y = 0;
-        if (y >= gridSize)
+        else if (y >= gridSize)
             y = gridSize - 1;
 
         // Store the new position in the particlePositions buffer
         particlePositions[2 * index] = x;
         particlePositions[2 * index + 1] = y;
-    }
-}
 
-// GPU kernel to check if a particle has come into contact with the aggregate
-__global__ void checkContactKernel(int* particlePositions, int* grid) {
-    // Generate a unique index for each thread
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // Check if the particle is in contact with an occupied cell
-    if (index < numParticles) {
-        // Get the current position of the particle
-        int x = particlePositions[2 * index];
-        int y = particlePositions[2 * index + 1];
-
+        // Check if the particle is in contact with an occupied cell
         if (x == -1 && y == -1)
             return;
 
         // Check if the current cell is occupied (i think this is useless)
-        if (grid[x + y * gridSize] == 2) {
-            // Mark the particle as stuck
-            particlePositions[2 * index] = -1;
-            particlePositions[2 * index + 1] = -1;
-        }
-        // Check the 8 neighboring cells
+        // if (grid[x + y * gridSize] == 2) {
+        //     // Mark the particle as stuck
+        //     particlePositions[2 * index] = -1;
+        //     particlePositions[2 * index + 1] = -1;
+        // }
+        // Check the 8 neighboring cells TODO do this with multiple ifs
         else {
-            for (int dx = -1; dx <= 1; dx++) {
+            for (int dx = -1; dx <= 1; dx++)
                 for (int dy = -1; dy <= 1; dy++) {
                     int nx = x + dx;
                     int ny = y + dy;
-                    if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
+                    if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize)
                         if (grid[nx + ny * gridSize] == 1) {
                             // Mark the particle as stuck
                             particlePositions[2 * index] = -1;
@@ -186,9 +167,7 @@ __global__ void checkContactKernel(int* particlePositions, int* grid) {
                             grid[x + y * gridSize] = 1;
                             break;
                         }
-                    }
                 }
-            }
         }
     }
 }

@@ -1,2 +1,6 @@
 Serial/out.ppm
 Serial/main
+cuda/main
+cuda/image.ppm
+Serial/serialUnoptimized/main
+Serial/serialUnoptimized/out.ppm

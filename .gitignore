@@ -1,6 +1,8 @@
 Serial/out.ppm
 Serial/main
 cuda/main
-cuda/out.ppm
+cuda/image.ppm
 Serial/serialUnoptimized/main
 Serial/serialUnoptimized/out.ppm
+.vscode/settings.json
+.vscode/tasks.json

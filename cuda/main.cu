@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
     int gridSize = atoi(argv[1]);
 
     // get number of particles sent from args
-    int numParticles = atoi(argv[2]) * 1024;
+    int numParticles = atoi(argv[2]);
 
     // get number of iterations for each particle from args
     int maxIterations = atoi(argv[3]);
@@ -133,6 +133,9 @@ int main(int argc, char* argv[]) {
         blockSize = atoi(argv[6]);
     else
         blockSize = 1024;  // I am using a 1080, so I can use a maximum of 1024 threads per block
+
+    // calculate the number of particles based on the number of threads per block
+    numParticles *= blockSize;
 
     // if the random seed is given from the command line arguments
     int randomSeed;

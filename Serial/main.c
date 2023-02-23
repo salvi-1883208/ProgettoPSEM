@@ -236,14 +236,38 @@ void drawCircleFromCenter(int **grid, int ci, int cj, int radius, int color) {
     free(circle);
 }
 
+// function to generate a random point in a circle with center ci, cj and radius radius
+void genPoinInCircle(int *x, int *y, int ci, int cj, int radius) {
+
+    // generate two random numbers in the [-1, 1] interval
+    float u = (float)rand() / (float)RAND_MAX * 2 - 1;
+    float v = (float)rand() / (float)RAND_MAX * 2 - 1;
+
+    // calculate the square of the numbers
+    float u2 = u * u;
+    float v2 = v * v;
+
+    // calculate the sum of the squares
+    float r = u2 + v2;
+
+    // if the sum is less than 1
+    if (r <= 1) {
+        // calculate the x and y coordinates
+        *x = (int)((u2 - v2) / r * radius + ci);
+        *y = (int)((2 * u * v) / r * radius + cj);
+    } else {
+        // if not generate a new point
+        genPoinInCircle(x, y, ci, cj, radius);
+    }
+}
+
+
 int main(int argc, char *argv[]) {
     // command line input: grid size, number of particles, number of steps, seed coordinates, close radius, random seed
     if ((argc - 1) < 6) {
         printf("Arguments are: square grid size, number of particles, number of maximum steps, seed coordinates, radius for a point to be consedered close to the stuck structure, seed for the rand() function.\n");
         return -1;
     }
-    // time execution start
-    clock_t start = clock();
 
     // get grid size from args
     gridSize = atoi(argv[1]);
@@ -285,6 +309,11 @@ int main(int argc, char *argv[]) {
         sj = (gridSize - 1) / 2;
     }
 
+    printf("\nSimulating growth...\n");
+
+    // time execution start
+    clock_t start = clock();
+
     // draw the first circle around the center
     drawCircleFromCenter(grid, si, sj, closeRadius, 3);
 
@@ -294,8 +323,8 @@ int main(int argc, char *argv[]) {
     // set the seed for the rand() function
     srand(randomSeed);
 
-    // conunter for the culled particles
-    int culled = 0;
+    // conunter for the skipped particles
+    int skipped = 0;
 
     // counter for the max distance from a particle of the structure and the original seed
     int maxDistance = 0;
@@ -307,19 +336,15 @@ int main(int argc, char *argv[]) {
     // temp variable used to increment the radius during the execution
     int closeRadiusT = closeRadius;
 
-    printf("\nSimulating growth...\n");
-
     // send particles number of particles
     for (int x = 0; x < particles; x++) {
         // generate random position at distance from center
         int i, j;
-        generatePointInCircle(&i, &j, si, sj, closeRadiusT - 2);
 
         // if the particle has been generated on an already stuck particle
-        if ((grid[i][j] == 1) || (grid[i][j] == 2)) {
-            x--;
-            continue;
-        }
+        do {
+            generatePointInCircle(&i, &j, si, sj, closeRadiusT - 2);
+        } while (grid[i][j] == 1 || grid[i][j] == 2);
 
         // the generated particle is not stuck
         bool stuck = false;
@@ -406,19 +431,19 @@ int main(int argc, char *argv[]) {
             avg += steps;
             if (steps > maxStep)
                 maxStep = steps;
-        }  // else the particle was culled, so increment counter
+        }  // else the particle was skipped, so increment counter
         else if (steps >= iterations)
-            culled++;
+            skipped++;
 
-        // if a particle did more than iteration steps it is culled
+        // if a particle did more than iteration steps it is skipped
     }
 
     printf("Simulation finished.\n\n");
 
-    // print the number of culled particles
-    printf("Of %d particles:\n - drawn %d,\n - culled %d.\n\n", particles, particles - culled, culled);
+    // print the number of skipped particles
+    printf("Of %d particles:\n - drawn %d,\n - skipped %d.\n\n", particles, particles - skipped, skipped);
 
-    avg = round(avg / (particles - culled));
+    avg = round(avg / (particles - skipped));
     printf("Average particle steps %d.\n", avg);
     printf("Max particle steps %d.\n", maxStep);
 

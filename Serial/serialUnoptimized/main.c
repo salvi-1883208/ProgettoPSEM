@@ -149,6 +149,11 @@ int main(int argc, char const *argv[]) {
     // save the grid to a file
     saveImage(grid, gridSize);
 
+    // free the grid
+    for (int i = 0; i < gridSize; i++)
+        free(grid[i]);
+    free(grid);
+
     return 0;
 }
 

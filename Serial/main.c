@@ -454,10 +454,14 @@ int main(int argc, char *argv[]) {
     saveImage(grid, gridSize);
 
     // print CPU time of main function
-    printf("CPU time in seconds: %f\n",
-           (double)(end - start) / (CLOCKS_PER_SEC));
+    printf("CPU time in seconds: %f\n", (double)(end - start) / (CLOCKS_PER_SEC));
 
     printf("Saved image as %s\n", IMG_NAME);
+
+    // free the grid
+    for (int i = 0; i < gridSize; i++)
+        free(grid[i]);
+    free(grid);
 
     return 0;
 }

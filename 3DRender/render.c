@@ -71,10 +71,8 @@ void display() {
 
                         // Reset polygon mode and color
                         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                        glColor3f(0.0, 0.0, 1.0);
                     }
-                    else
-                        glColor3f(1.0, 1.0, 1.0); // Set the color of the cube faces to white
+                    glColor3f(1.0, 1.0, 1.0); // Set the color of the cube faces to white
                     glutSolidCube(0.99);
 
                     // Draw wireframe cube

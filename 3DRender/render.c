@@ -51,15 +51,16 @@ void display() {
     glLoadIdentity();
 
     // set camera position
-    glTranslatef(-(size-1)/2.0, -(size-1)/2.0, -(size-1)/2.0 - distance);
+    glTranslatef(0.0, 0.0, -distance);
     glRotatef(angleY, 1.0, 0.0, 0.0);
     glRotatef(angleX, 0.0, 1.0, 0.0);
+    glTranslatef(-(size-1)/2.0, -(size-1)/2.0, -(size-1)/2.0);
 
     for (int i = 0; i < size; i++) {
         for (int j = 0; j < size; j++) {
             for (int k = 0; k < size; k++) {
                 glPushMatrix();
-                glTranslatef(i-1.0, j-1.0, k-1.0);
+                glTranslatef(i, j, k);
                 if(matrix[i][j][k]) {
                     // Draw solid cube
                     if(i == size / 2 && j == size / 2 && k == size / 2) {
@@ -93,11 +94,13 @@ void display() {
     glutSwapBuffers();
 
     // draw borders of matrix using a red cube
+    glLoadIdentity();
+    glTranslatef(-(size-1)/2.0, -(size-1)/2.0, -(size-1)/2.0);
     glLineWidth(3.0); // set line width to 3
     glColor3f(1.0, 0.0, 0.0); // set color to red
     glutWireCube(size); // draw wireframe cube with size of matrix
-
 }
+
 
 void mouse(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
@@ -106,11 +109,11 @@ void mouse(int button, int state, int x, int y) {
     }
     // Handle mouse wheel events
     if (button == 3) { // Mouse wheel up
-        distance -= 0.5;
+        distance -= 2.0;
         glutPostRedisplay();
     }
     else if (button == 4) { // Mouse wheel down
-        distance += 0.5;
+        distance += 2.0;
         glutPostRedisplay();
     }
 }
@@ -126,12 +129,12 @@ void motion(int x, int y) {
 }
 
 void keyboard(unsigned char key, int x, int y) {
-    if (key == 'f') { // zoom in
-        distance -= 0.5;
+    if (key == 'i') { // zoom in
+        distance -= 2.0;
         glutPostRedisplay();
     }
-    else if (key == 's') { // zoom out
-        distance += 0.5;
+    else if (key == 'o') { // zoom out
+        distance += 2.0;
         glutPostRedisplay();
     }
 }
@@ -140,7 +143,7 @@ int main(int argc, char** argv) {
     // load matrix from file
     matrix = read_matrix_from_file(&size, "matrix.txt");
 
-    distance = size;
+    distance = size * 1.3;
 
     // OpenGL setup
     glutInit(&argc, argv);
@@ -150,7 +153,6 @@ int main(int argc, char** argv) {
     glViewport(0, 0, width, height);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    // gluPerspective(45.0, 1.0, 0.1, (double) (size * 5));
     gluPerspective(45.0, (double) width / height, 0.1, (double) (size * 5));
     glutDisplayFunc(display);
     glutMouseFunc(mouse);

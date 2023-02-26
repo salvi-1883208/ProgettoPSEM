@@ -11,4 +11,4 @@ Execute with `./main size, particles, iterations, seed_x, seed_y, random_seed`
 
 <br> Example of the image generated with `./main 700 30000 0 -1 0`.
 <br> <br> 
-<img src="https://user-images.githubusercontent.com/62235561/220996882-1d3b86b7-cba0-4119-a20c-ef0e6e8e88b7.png" title="Optional title">
+<img src="https://user-images.githubusercontent.com/62235561/220996882-1d3b86b7-cba0-4119-a20c-ef0e6e8e88b7.png" title="Example image">

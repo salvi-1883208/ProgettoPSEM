@@ -12,4 +12,4 @@ Execute with `./main size, particles, iterations, seed_x, seed_y, block_size, ra
 
 <br> Example of the image generated with `./main 1000 64 0 -1 0`.
 <br> <br> 
-<img src="https://user-images.githubusercontent.com/62235561/220726014-4e7b788e-f8aa-4f72-831c-9ee65a23feef.png" title="Optional title">
+<img src="https://user-images.githubusercontent.com/62235561/220726014-4e7b788e-f8aa-4f72-831c-9ee65a23feef.png" title="Example image">

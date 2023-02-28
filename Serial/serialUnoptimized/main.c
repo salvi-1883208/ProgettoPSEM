@@ -94,7 +94,6 @@ int main(int argc, char const *argv[]) {
             else if (y > gridSize - 2)
                 y = gridSize - 2;
 
-            // if the particle not outside the grid &&
             // if the particle is close to an already stuck particle
             if (grid[x - 1][y - 1] ||    // top left
                  grid[x][y - 1] ||       // top

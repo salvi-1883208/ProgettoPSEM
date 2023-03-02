@@ -3,43 +3,49 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define particles 5000
-
 void move_particle(int *x, int *y, int m);
-void save_image(int **grid, int size);
+void save_image(int *grid, int size);
 
 int main(int argc, char **argv) {
     double start, end;
     // Simulation parameters
     int max_steps = 100000;  // Number of steps
-    int grid_size = 400;     // Size of the grid
+    int grid_size = 500;     // Size of the grid
+    int process_count, my_rank;
+    int *grid;
+    int particles = 6000;
 
-    // Allocate memory for the grid
-    int **my_grid = (int **)malloc(sizeof(int *) * grid_size);
-    for (int i = 0; i < grid_size; i++)
-        my_grid[i] = (int *)malloc(sizeof(int) * grid_size);
-
-    // Initialize the grid
-    for (int i = 0; i < grid_size; i++)
-        for (int j = 0; j < grid_size; j++)
-            my_grid[i][j] = 0;
-
-    // place the seed particle
-    my_grid[grid_size / 2][grid_size / 2] = 1;
-
-    // Initialize the MPI environment
     MPI_Init(NULL, NULL);
-
-    // Get the number of processes
-    int process_count;
     MPI_Comm_size(MPI_COMM_WORLD, &process_count);
-
-    // Get the rank of the process
-    int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
     // Initialize the random number generator
     srand(my_rank);
+
+    MPI_Comm comm = MPI_COMM_WORLD;
+    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, my_rank, MPI_INFO_NULL, &comm);
+
+    MPI_Win win;
+    // Allocate shared memory for the grid just for the root process
+    if (my_rank == 0) {  // TODO look into mpi_info info hint called "noncontig"
+        MPI_Win_allocate_shared(grid_size * grid_size * sizeof(int), sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &grid, &win);
+        for (int i = 0; i < grid_size; i++)
+            for (int j = 0; j < grid_size; j++)
+                grid[i * grid_size + j] = 0;
+
+        // place the seed particle
+        grid[(grid_size / 2) * grid_size + (grid_size / 2)] = 1;
+    } else
+        MPI_Win_allocate_shared(0, sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &grid, &win);
+    // i have to do this because MPI_Win_allocate_shared allocates memory for all processes, even if they don't need it
+    // this way i can use the same code for all processes and just ignore the memory allocation for the other processes
+    // but i still need to call MPI_Win_allocate_shared for all processes because it's a collective call
+
+    // get the address of the shared memory
+    int disp_unit;
+    MPI_Aint size;
+    MPI_Win_shared_query(win, 0, &size, &disp_unit, &grid);
+    // at this point grid is a pointer to the shared memory
 
     // divide the particles between the processes
     int my_particles = particles / process_count;
@@ -61,18 +67,10 @@ int main(int argc, char **argv) {
             my_x = rand() % grid_size;
             my_y = rand() % grid_size;
             my_i++;
-        } while (my_grid[my_x][my_y] && my_i < max_steps);
+        } while (grid[my_x * grid_size + my_y] && my_i < max_steps);
 
         while (my_i < max_steps) {
-            // if recieving a message from another process
-            int my_flag = 0;
-            MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &my_flag, MPI_STATUS_IGNORE);
-            if (my_flag) {
-                int my_p[2];
-                MPI_Recv(&my_p, 2, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                // if two processes finish at the same time, the value will be higher than 1 (overlapping)
-                my_grid[my_p[0]][my_p[1]]++;
-            }
+            // make it in bounds
             if (my_x < 1)
                 my_x = 1;
             else if (my_x > grid_size - 2)
@@ -82,27 +80,32 @@ int main(int argc, char **argv) {
             else if (my_y > grid_size - 2)
                 my_y = grid_size - 2;
 
+            // shared lock
+            MPI_Win_lock(MPI_LOCK_SHARED, 0, 0, win);
             // if the particle is close to an already stuck particle
-            if (my_grid[my_x - 1][my_y - 1] ||  // top left
-                my_grid[my_x][my_y - 1] ||      // top
-                my_grid[my_x + 1][my_y - 1] ||  // top right
-                my_grid[my_x - 1][my_y] ||      // left
-                my_grid[my_x + 1][my_y] ||      // right
-                my_grid[my_x - 1][my_y + 1] ||  // bottom left
-                my_grid[my_x][my_y + 1] ||      // bottom
-                my_grid[my_x + 1][my_y + 1]) {  // bottom right
+            if (grid[(my_x - 1) * grid_size + (my_y - 1)] ||  // top left
+                grid[(my_x - 1) * grid_size + my_y] ||        // top
+                grid[(my_x - 1) * grid_size + (my_y + 1)] ||  // top right
+                grid[my_x * grid_size + (my_y - 1)] ||        // left
+                grid[my_x * grid_size + (my_y + 1)] ||        // right
+                grid[(my_x + 1) * grid_size + (my_y - 1)] ||  // bottom left
+                grid[(my_x + 1) * grid_size + my_y] ||        // bottom
+                grid[(my_x + 1) * grid_size + (my_y + 1)]) {  // bottom right
 
+                // unlock
+                MPI_Win_unlock(0, win);
+                // lock
+                MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, win);
                 // if the particle is close to an already stuck particle, attach it to the grid
-                my_grid[my_x][my_y]++;
+                grid[my_x * grid_size + my_y]++;
 
-                for (int t = 0; t < process_count; t++)
-                    if (t != my_rank) {
-                        MPI_Request my_req;
-                        int my_p[2] = {my_x, my_y};
-                        MPI_Isend(&my_p, 2, MPI_INT, t, 0, MPI_COMM_WORLD, &my_req);
-                    }
+                // unlock
+                MPI_Win_unlock(0, win);
+
                 break;
             }
+            // unlock
+            MPI_Win_unlock(0, win);
 
             // move the particle in a random direction
             move_particle(&my_x, &my_y, rand() % 8);
@@ -111,24 +114,18 @@ int main(int argc, char **argv) {
             my_i++;
         }
     }
-    int last_process = -1;
     // wait for all processes to finish
     MPI_Barrier(MPI_COMM_WORLD);
     end = MPI_Wtime();
     if (my_rank == 0)
         printf("Execution time: %f seconds\n", end - start);
 
-    // see who is the last process
-    MPI_Reduce(&my_rank, &last_process, 1, MPI_INT, MPI_MAX, process_count - 1, MPI_COMM_WORLD);
-
     // if the last process, save the image
-    if (my_rank == last_process)
-        save_image(my_grid, grid_size);
+    if (my_rank == 0)
+        save_image(grid, grid_size);
 
-    // free the memory
-    for (int i = 0; i < grid_size; i++)
-        free(my_grid[i]);
-    free(my_grid);
+    // free the shared memory
+    MPI_Win_free(&win);
 
     // Finalize the MPI environment.
     MPI_Finalize();
@@ -170,7 +167,7 @@ void move_particle(int *x, int *y, int m) {
     }
 }
 
-void save_image(int **grid, int size) {
+void save_image(int *grid, int size) {
     // save image to .ppm file
     int count = 0;
     int i, j;
@@ -179,7 +176,7 @@ void save_image(int **grid, int size) {
     for (i = 0; i < size; ++i) {
         for (j = 0; j < size; ++j) {
             static unsigned char color[3];
-            switch (grid[j][i]) {
+            switch (grid[i * size + j]) {
                 case 1:             // stuck particles
                     color[0] = 255; /* red */
                     color[1] = 255; /* green */
@@ -195,7 +192,7 @@ void save_image(int **grid, int size) {
                     color[0] = 255; /* red */
                     color[1] = 0;   /* green */
                     color[2] = 0;   /* blue */
-                    count += grid[j][i];
+                    count += grid[i * size + j];
                     break;
             }
             // seed

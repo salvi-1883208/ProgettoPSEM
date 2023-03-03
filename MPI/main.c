@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define particles 12000
+#define particles 64000
 
 void move_particle(int *x, int *y, int m);
 void save_image(int *grid, int size);
@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
     double start, end;
     // Simulation parameters
     int max_steps = 100000;  // Number of steps
-    int grid_size = 400;     // Size of the grid
+    int grid_size = 800;     // Size of the grid
     int *my_grid;
 
     // Initialize the MPI environment
@@ -86,8 +86,8 @@ int main(int argc, char **argv) {
                     if (p != my_rank) {
                         int a = 1;
                         // lock
-                        // MPI_Win_lock(MPI_LOCK_EXCLUSIVE, p, 0, win);
-                        MPI_Put(&my_grid[my_x * grid_size + my_y], 1, MPI_INT, p, my_x * grid_size + my_y, 1, MPI_INT, win);
+                        MPI_Win_lock(MPI_LOCK_EXCLUSIVE, p, 0, win);
+                        // MPI_Put(&my_grid[my_x * grid_size + my_y], 1, MPI_INT, p, my_x * grid_size + my_y, 1, MPI_INT, win);
                         MPI_Accumulate(&a, 1, MPI_INT, p, my_x * grid_size + my_y, 1, MPI_INT, MPI_SUM, win);
                         MPI_Win_unlock(p, win);
                     }

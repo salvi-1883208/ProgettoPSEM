@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
                 my_y = grid_size - 2;
 
             // shared lock
-            MPI_Win_lock(MPI_LOCK_SHARED, 0, 0, win);
+            // MPI_Win_lock(MPI_LOCK_SHARED, 0, 0, win);
             // if the particle is close to an already stuck particle
             if (grid[(my_x - 1) * grid_size + (my_y - 1)] ||  // top left
                 grid[(my_x - 1) * grid_size + my_y] ||        // top
@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
                 grid[(my_x + 1) * grid_size + (my_y + 1)]) {  // bottom right
 
                 // unlock
-                MPI_Win_unlock(0, win);
+                // MPI_Win_unlock(0, win);
                 // lock
                 MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, win);
                 // if the particle is close to an already stuck particle, attach it to the grid
@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
                 break;
             }
             // unlock
-            MPI_Win_unlock(0, win);
+            // MPI_Win_unlock(0, win);
 
             // move the particle in a random direction
             move_particle(&my_x, &my_y, rand() % 8);

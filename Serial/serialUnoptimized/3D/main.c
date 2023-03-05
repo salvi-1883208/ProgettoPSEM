@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <time.h>
 
-void write_matrix_to_file(int*** matrix, int dim, char* filename);
-void move_particle(int *x, int *y, int* z, int m);
+void write_matrix_to_file(int ***matrix, int dim, char *filename);
+void move_particle(int *x, int *y, int *z, int m);
 int is_close_to_stuck(int ***grid, int x, int y, int z, int size);
-void free_matrix(int*** matrix, int dim);
+void free_matrix(int ***matrix, int dim);
 
 int main(int argc, char const *argv[]) {
     // command line input: grid size, number of particles, number of steps, seed coordinates, random seed
@@ -29,7 +29,7 @@ int main(int argc, char const *argv[]) {
     int si = atoi(argv[4]) - 1;
     int sj = atoi(argv[5]) - 1;
     int sk = atoi(argv[6]) - 1;
-    
+
     // if the random seed is given from the command line arguments
     int randomSeed;
     if (argc == 8)
@@ -106,7 +106,7 @@ int main(int argc, char const *argv[]) {
                 z = gridSize - 2;
 
             // if the particle is close to an already stuck particle
-            if (is_close_to_stuck(grid, x, y, z, gridSize)) {   // bottom right
+            if (is_close_to_stuck(grid, x, y, z, gridSize)) {  // bottom right
 
                 // if the particle is close to an already stuck particle, attach it to the grid
                 grid[x][y][z]++;
@@ -151,7 +151,7 @@ int main(int argc, char const *argv[]) {
 
     // save the grid to a file
     write_matrix_to_file(grid, gridSize, "matrix.txt");
-    
+
     // free the grid
     free_matrix(grid, gridSize);
 
@@ -159,49 +159,130 @@ int main(int argc, char const *argv[]) {
 }
 
 // check if the particle is close to a stuck particle
-int is_close_to_stuck(int ***grid, int x, int y, int z, int size){
-    for(int i = -1; i <= 1; i++)
-        for(int j = -1; j <= 1; j++)
-            for(int k = -1; k <= 1; k++)
-                if(grid[x + i][y + j][z + k])
+int is_close_to_stuck(int ***grid, int x, int y, int z, int size) {
+    for (int i = -1; i <= 1; i++)
+        for (int j = -1; j <= 1; j++)
+            for (int k = -1; k <= 1; k++)
+                if (grid[x + i][y + j][z + k])
                     return 1;
+    return 0;
 }
 
-// move the particle in the random direction 
+// move the particle in the random direction
 // (it sucks but is faster (i think))
 void move_particle(int *x, int *y, int *z, int m) {
     switch (m) {
-        case 0: (*x)--; (*y)--; (*z)--; break;
-        case 1: (*x)--; (*y)--; break;
-        case 2: (*x)--; (*y)--; (*z)++; break;
-        case 3: (*x)--; (*z)--; break;
-        case 4: (*x)--; break;
-        case 5: (*x)--; (*z)++; break;
-        case 6: (*x)--; (*y)++; (*z)--; break;
-        case 7: (*x)--; (*y)++; break;
-        case 8: (*x)--; (*y)++; (*z)++; break;
-        case 9: (*y)--; (*z)--; break;
-        case 10: (*y)--; break;
-        case 11: (*y)--; (*z)++; break;
-        case 12: (*z)--; break;
-        case 13: (*z)++; break;
-        case 14: (*x)++; (*y)--; (*z)--; break;
-        case 15: (*x)++; (*y)--; break;
-        case 16: (*x)++; (*y)--; (*z)++; break;
-        case 17: (*x)++; (*z)--; break;
-        case 18: (*x)++; break;
-        case 19: (*x)++; (*z)++; break;
-        case 20: (*x)++; (*y)++; (*z)--; break;
-        case 21: (*x)++; (*y)++; break;
-        case 22: (*x)++; (*y)++; (*z)++; break;
-        case 23: (*y)++; (*z)--; break;
-        case 24: (*y)++; break;
-        case 25: (*y)++; (*z)++; break;
+        case 0:
+            (*x)--;
+            (*y)--;
+            (*z)--;
+            break;
+        case 1:
+            (*x)--;
+            (*y)--;
+            break;
+        case 2:
+            (*x)--;
+            (*y)--;
+            (*z)++;
+            break;
+        case 3:
+            (*x)--;
+            (*z)--;
+            break;
+        case 4:
+            (*x)--;
+            break;
+        case 5:
+            (*x)--;
+            (*z)++;
+            break;
+        case 6:
+            (*x)--;
+            (*y)++;
+            (*z)--;
+            break;
+        case 7:
+            (*x)--;
+            (*y)++;
+            break;
+        case 8:
+            (*x)--;
+            (*y)++;
+            (*z)++;
+            break;
+        case 9:
+            (*y)--;
+            (*z)--;
+            break;
+        case 10:
+            (*y)--;
+            break;
+        case 11:
+            (*y)--;
+            (*z)++;
+            break;
+        case 12:
+            (*z)--;
+            break;
+        case 13:
+            (*z)++;
+            break;
+        case 14:
+            (*x)++;
+            (*y)--;
+            (*z)--;
+            break;
+        case 15:
+            (*x)++;
+            (*y)--;
+            break;
+        case 16:
+            (*x)++;
+            (*y)--;
+            (*z)++;
+            break;
+        case 17:
+            (*x)++;
+            (*z)--;
+            break;
+        case 18:
+            (*x)++;
+            break;
+        case 19:
+            (*x)++;
+            (*z)++;
+            break;
+        case 20:
+            (*x)++;
+            (*y)++;
+            (*z)--;
+            break;
+        case 21:
+            (*x)++;
+            (*y)++;
+            break;
+        case 22:
+            (*x)++;
+            (*y)++;
+            (*z)++;
+            break;
+        case 23:
+            (*y)++;
+            (*z)--;
+            break;
+        case 24:
+            (*y)++;
+            break;
+        case 25:
+            (*y)++;
+            (*z)++;
+            break;
     }
 }
 
 // save the grid to a file
-void write_matrix_to_file(int*** matrix, int dim, char* filename) {
+void write_matrix_to_file(int ***matrix, int dim, char *filename) {
     FILE *fp = fopen(filename, "w");
     if (fp == NULL) {
         printf("Error opening file %s\n", filename);
@@ -209,21 +290,21 @@ void write_matrix_to_file(int*** matrix, int dim, char* filename) {
     }
     fprintf(fp, "%d\n", dim);
 
-    for (int i = 0; i < dim; i++) 
-        for (int j = 0; j < dim; j++) 
-            for (int k = 0; k < dim; k++) 
-                if (matrix[i][j][k]) 
+    for (int i = 0; i < dim; i++)
+        for (int j = 0; j < dim; j++)
+            for (int k = 0; k < dim; k++)
+                if (matrix[i][j][k])
                     fprintf(fp, "%d %d %d\n", i, j, k);
 
     fclose(fp);
 }
 
 // free the grid
-void free_matrix(int*** matrix, int dim) {
-	for (int i = 0; i < dim; i++) {
-		for (int j = 0; j < dim; j++) 
+void free_matrix(int ***matrix, int dim) {
+    for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < dim; j++)
             free(matrix[i][j]);
-		free(matrix[i]);
-	}
-	free(matrix);
+        free(matrix[i]);
+    }
+    free(matrix);
 }

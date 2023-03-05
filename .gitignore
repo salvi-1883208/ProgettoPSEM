@@ -10,4 +10,10 @@ Serial/serialUnoptimized/3D/render
 cuda/3D/main
 cuda/3D/matrix.txt
 cuda/3D/render
+MPI/main
+MPI/out.ppm
+MPI/TODO
+MPI/3D/main
+MPI/3D/matrix.txt
+MPI/3D/render
 .vscode/

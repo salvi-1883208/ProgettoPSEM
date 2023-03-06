@@ -90,7 +90,7 @@ int main(int argc, char const *argv[]) {
         // number of iterations
         int i = 0;
 
-        while (i < iterations || iterations == 0) {
+        while (i < iterations) {
             // if the particle is outside the grid, move it back inside
             if (x < 1)
                 x = 1;
@@ -124,7 +124,7 @@ int main(int argc, char const *argv[]) {
         }
 
         // if the particle has done all the iterations, skip it
-        if (i >= iterations && iterations != 0)
+        if (i >= iterations)
             skipped++;
 
         // calculate avgSteps and max steps

@@ -28,7 +28,7 @@ int main(int argc, char const *argv[]) {
     // get seed coordinates from args
     int si = atoi(argv[4]) - 1;
     int sj = atoi(argv[5]) - 1;
-    
+
     // if the random seed is given from the command line arguments
     int randomSeed;
     if (argc == 7)
@@ -83,7 +83,7 @@ int main(int argc, char const *argv[]) {
         // number of iterations
         int i = 0;
 
-        while (i < iterations || iterations == 0) {
+        while (i < iterations) {
             // if the particle is outside the grid, move it back inside
             if (x < 1)
                 x = 1;
@@ -95,14 +95,14 @@ int main(int argc, char const *argv[]) {
                 y = gridSize - 2;
 
             // if the particle is close to an already stuck particle
-            if (grid[x - 1][y - 1] ||    // top left
-                 grid[x][y - 1] ||       // top
-                 grid[x + 1][y - 1] ||   // top right
-                 grid[x - 1][y] ||       // left
-                 grid[x + 1][y] ||       // right
-                 grid[x - 1][y + 1] ||   // bottom left
-                 grid[x][y + 1] ||       // bottom
-                 grid[x + 1][y + 1]) {   // bottom right
+            if (grid[x - 1][y - 1] ||  // top left
+                grid[x][y - 1] ||      // top
+                grid[x + 1][y - 1] ||  // top right
+                grid[x - 1][y] ||      // left
+                grid[x + 1][y] ||      // right
+                grid[x - 1][y + 1] ||  // bottom left
+                grid[x][y + 1] ||      // bottom
+                grid[x + 1][y + 1]) {  // bottom right
 
                 // if the particle is close to an already stuck particle, attach it to the grid
                 grid[x][y]++;
@@ -120,7 +120,7 @@ int main(int argc, char const *argv[]) {
         }
 
         // if the particle has done all the iterations, skip it
-        if (i >= iterations && iterations != 0)
+        if (i >= iterations)
             skipped++;
 
         // calculate avgSteps and max steps

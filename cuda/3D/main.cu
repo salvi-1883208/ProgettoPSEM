@@ -47,10 +47,8 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state, int grid
         z = curand(&localState) % gridSize;
     } while (grid[z * gridSize * gridSize + y * gridSize + x]);
 
-    // printf("Thread (%d, %d) started (%d, %d)\n", blockIdx.x, id, x, y);
-
     // initialize the counter for the number of iterations
-    int g = -1;
+    int g = 0;
 
     // iterate until the particle is attached to the grid or it did more than maxIterations number of iterations
     while ((g <= maxIterations)) {
@@ -76,7 +74,6 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state, int grid
                         // if the particle is close to an already stuck particle, attach it to the grid
                         // (using atomicAdd to count the overlapping particles)
                         atomicAdd(&grid[z * gridSize * gridSize + y * gridSize + x], 1);
-
                         return;
                     }
 
@@ -86,17 +83,13 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state, int grid
         // move the particle in the random direction
         move_particle(&x, &y, &z, dir);
 
-        // increment the number of iterations for each time the move is made
-        // (I have to do it here because of warp divergence)
-        if (maxIterations != 0)
-            g++;
+        // increment the counter for the number of iterations
+        g++;
     }
 
     // if the particle did more than MAX_ITER number of iterations, skip it
     // if I remove this it doesn't work, probably because of in warp divergence
     atomicAdd(skipped, 1);
-
-    // printf("Thread (%d, %d) skipped\n", blockIdx.x, id);
 
     return;
 }

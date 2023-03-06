@@ -42,10 +42,8 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state, int grid
         y = curand(&localState) % gridSize;
     } while (grid[y * gridSize + x]);
 
-    // printf("Thread (%d, %d) started (%d, %d)\n", blockIdx.x, id, x, y);
-
     // initialize the counter for the number of iterations
-    int i = -1;
+    int i = 0;
 
     // iterate until the particle is attached to the grid or it did more than maxIterations number of iterations
     while ((i <= maxIterations)) {
@@ -73,8 +71,6 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state, int grid
             // (using atomicAdd to count the overlapping particles)
             atomicAdd(&grid[y * gridSize + x], 1);
 
-            // printf("Thread (%d, %d) finished (%d, %d)\n", blockIdx.x, id, x, y);
-
             return;
         }
 
@@ -84,17 +80,13 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state, int grid
         // move the particle in the random direction
         move_particle(&x, &y, dir);
 
-        // increment the number of iterations for each time the move is made
-        // (I have to do it here because of warp divergence)
-        if (maxIterations != 0)
-            i++;
+        // increment the number of iterations
+        i++;
     }
 
     // if the particle did more than MAX_ITER number of iterations, skip it
     // if I remove this it doesn't work, probably because of in warp divergence
     atomicAdd(skipped, 1);
-
-    // printf("Thread (%d, %d) skipped\n", blockIdx.x, id);
 
     return;
 }
@@ -214,18 +206,16 @@ int main(int argc, char* argv[]) {
         // if there are overlapping particles launch the kernel again until there are none
     } while (over > 0);
 
-    // time execution end
-    clock_t end = clock();
+    // stop the timer
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&time, start, stop);
 
     printf("Simulation finished.\n\n");
 
     // print the number of skipped particles
     printf("Of %d particles:\n - drawn %d,\n - skipped %d.\n\n", numParticles, numParticles - *skipped, *skipped);
 
-    // print execution time
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time, start, stop);
     // print the time to simulate in seconds
     printf("Time to simulate: %f seconds.\n", time / 1000);
 
@@ -300,20 +290,15 @@ void saveImage(int* grid, int size) {
         for (j = 0; j < size; ++j) {
             static unsigned char color[3];
             switch (grid[j * size + i]) {
-                case 1:             // stuck particles
-                    color[0] = 255; /* red */
-                    color[1] = 255; /* green */
-                    color[2] = 255; /* blue */
-                    break;
                 case 0:           // empty spots
                     color[0] = 0; /* red */
                     color[1] = 0; /* green */
                     color[2] = 0; /* blue */
                     break;
-                default:            // overlapping
+                default:            // stuck particles
                     color[0] = 255; /* red */
-                    color[1] = 0;   /* green */
-                    color[2] = 0;   /* blue */
+                    color[1] = 255; /* green */
+                    color[2] = 255; /* blue */
                     break;
             }
             (void)fwrite(color, 1, 3, fp);

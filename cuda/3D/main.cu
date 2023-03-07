@@ -23,7 +23,8 @@ __global__ void setup_kernel(curandState* state, int randomSeed) {
 }
 
 // kernel to perform the dla algorithm
-__global__ void dla_kernel(int* grid, int* skipped, curandState* state, int gridSize, int maxIterations) {
+__global__ void dla_kernel(int* grid, int* skipped, curandState* state,
+                           int gridSize, int maxIterations) {
     // calculate thread id
     int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -35,7 +36,8 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state, int grid
     int y;
     int z;
 
-    // if the particle has been generated on a stuck particle, generate a new position
+    // if the particle has been generated on a stuck particle, generate a new
+    // position
     do {
         x = curand(&localState) % gridSize;
         y = curand(&localState) % gridSize;
@@ -45,7 +47,8 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state, int grid
     // initialize the counter for the number of iterations
     int g = 0;
 
-    // iterate until the particle is attached to the grid or it did more than maxIterations number of iterations
+    // iterate until the particle is attached to the grid or it did more than
+    // maxIterations number of iterations
     while ((g <= maxIterations)) {
         // if the particle is outside the grid, move it back inside
         if (x < 1)
@@ -90,7 +93,8 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state, int grid
 }
 
 int main(int argc, char* argv[]) {
-    // command line input: grid size, number of particles, number of steps, seed coordinates, block size, random seed
+    // command line input: grid size, number of particles, number of steps, seed
+    // coordinates, block size, random seed
     if ((argc) < 7) {
         printf("Arguments are: square grid size, number of particles times block size, number of maximum steps, seed coordinates, the number of threads per block, seed for the curand() function.\n");
         return -1;
@@ -111,9 +115,11 @@ int main(int argc, char* argv[]) {
     int sk = atoi(argv[6]) - 1;
 
     // if given out image coordinates place seed in the middle
-    if (si < 0 || sj < 0 || sk < 0 || si > gridSize || sj > gridSize || sk > gridSize) {
+    if (si < 0 || sj < 0 || sk < 0 || si > gridSize || sj > gridSize ||
+        sk > gridSize) {
         printf("Given outside of image seed coordinates.\n");
-        printf("Setting seed coordinates to %d, %d, %d.\n", gridSize / 2, gridSize / 2, gridSize / 2);
+        printf("Setting seed coordinates to %d, %d, %d.\n", gridSize / 2,
+               gridSize / 2, gridSize / 2);
         si = (gridSize - 1) / 2;
         sj = (gridSize - 1) / 2;
         sk = (gridSize - 1) / 2;
@@ -124,7 +130,8 @@ int main(int argc, char* argv[]) {
     if (argc >= 8)
         blockSize = atoi(argv[7]);
     else
-        blockSize = 1024;  // I am using a 1080, so I can use a maximum of 1024 threads per block
+        blockSize = 1024;  // I am using a 1080, so I can use a maximum of 1024
+                           // threads per block
 
     // calculate the number of particles based on the number of threads per block
     numParticles *= blockSize;
@@ -135,7 +142,8 @@ int main(int argc, char* argv[]) {
         // get seed for the rand() function from args
         randomSeed = atoi(argv[8]);
     else
-        // if the random seed is not given from the command line arguments, use a default value
+        // if the random seed is not given from the command line arguments, use a
+        // default value
         randomSeed = 3521;
 
     // calculate the number of blocks
@@ -143,7 +151,8 @@ int main(int argc, char* argv[]) {
 
     // allocate the grid for both the host and the device
     int* grid;
-    cudaMallocManaged((void**)&grid, gridSize * gridSize * gridSize * sizeof(int), cudaMemAttachGlobal);
+    cudaMallocManaged((void**)&grid, gridSize * gridSize * gridSize * sizeof(int),
+                      cudaMemAttachGlobal);
 
     // initialize the grid
     for (int i = 0; i < gridSize; i++)
@@ -205,7 +214,8 @@ int main(int argc, char* argv[]) {
             blocks = 1;
             blockSize = over;
         }
-        // if there are overlapping particles launch the kernel again until there are none
+        // if there are overlapping particles launch the kernel again until there
+        // are none
     } while (over > 0);
 
     // stop timer for execution time
@@ -216,10 +226,11 @@ int main(int argc, char* argv[]) {
     printf("Simulation finished.\n\n");
 
     // print the number of skipped particles
-    printf("Of %d particles:\n - drawn %d,\n - skipped %d.\n\n", numParticles, numParticles - *skipped, *skipped);
+    printf("Of %d particles:\n - drawn %d,\n - skipped %d.\n\n", numParticles,
+           numParticles - *skipped, *skipped);
 
     // print the time to simulate in seconds
-    printf("Time to simulate: %f seconds.\n", time / 1000);
+    printf("Execution time in seconds: %f\n", time / 1000);
 
     // save the grid as a .ppm image and get the number of skipped particles
     write_matrix_to_file(grid, gridSize);

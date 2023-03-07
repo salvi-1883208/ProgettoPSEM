@@ -40,7 +40,7 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state, int grid
     do {
         x = curand(&localState) % gridSize;
         y = curand(&localState) % gridSize;
-    } while (grid[y * gridSize + x]);
+    } while (grid[x * gridSize + y]);
 
     // initialize the counter for the number of iterations
     int i = 0;
@@ -58,18 +58,18 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state, int grid
             y = gridSize - 2;
 
         // if the particle is close to an already stuck particle
-        if (grid[(y - 1) * gridSize + (x - 1)] ||  // top left
-            grid[(y - 1) * gridSize + x] ||        // top
-            grid[(y - 1) * gridSize + (x + 1)] ||  // top right
-            grid[y * gridSize + (x - 1)] ||        // left
-            grid[y * gridSize + (x + 1)] ||        // right
-            grid[(y + 1) * gridSize + (x - 1)] ||  // bottom left
-            grid[(y + 1) * gridSize + x] ||        // bottom
-            grid[(y + 1) * gridSize + (x + 1)]) {  // bottom right
+        if (grid[(x - 1) * gridSize + (y - 1)] ||  // top left
+            grid[(x - 1) * gridSize + y] ||        // top
+            grid[(x - 1) * gridSize + (y + 1)] ||  // top right
+            grid[x * gridSize + (y - 1)] ||        // left
+            grid[x * gridSize + (y + 1)] ||        // right
+            grid[(x + 1) * gridSize + (y - 1)] ||  // bottom left
+            grid[(x + 1) * gridSize + y] ||        // bottom
+            grid[(x + 1) * gridSize + (y + 1)]) {  // bottom right
 
             // if the particle is close to an already stuck particle, attach it to the grid
             // (using atomicAdd to count the overlapping particles)
-            atomicAdd(&grid[y * gridSize + x], 1);
+            atomicAdd(&grid[x * gridSize + y], 1);
 
             return;
         }
@@ -94,7 +94,7 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state, int grid
 int main(int argc, char* argv[]) {
     // command line input: grid size, number of particles, number of steps, seed coordinates, block size, random seed
     if ((argc) < 6) {
-        printf("Arguments are: square grid size, number of particles times 1024, number of maximum steps, seed coordinates, the number of threads per block, seed for the curand() function.\n");
+        printf("Arguments are: square grid size, number of particles times block size, number of maximum steps, seed coordinates, the number of threads per block, seed for the curand() function.\n");
         return -1;
     }
 
@@ -151,7 +151,7 @@ int main(int argc, char* argv[]) {
             grid[i * gridSize + j] = 0;
 
     // place the seed in si, sj
-    grid[sj * gridSize + si] = 1;
+    grid[si * gridSize + sj] = 1;
 
     // allocate the skipped counter for both the host and the device
     int* skipped;
@@ -164,12 +164,6 @@ int main(int argc, char* argv[]) {
     curandState* d_state;
     cudaMalloc((void**)&d_state, blocks * blockSize * sizeof(curandState));
 
-    // launch the kernel to set up the seed for each thread
-    setup_kernel<<<blocks, blockSize>>>(d_state, randomSeed);
-
-    // wait for the kernel to finish
-    cudaDeviceSynchronize();
-
     printf("\nSimulating growth...\n");
 
     // time execution start
@@ -180,10 +174,17 @@ int main(int argc, char* argv[]) {
     cudaEventRecord(start, 0);
 
     // initialize the number of overlapping particles
-    int over = 0;
+    int over = 1;
 
     // this implementation ignores the overlapping particles and re-launches them until there are none
-    do {  // launch the kernel to perform the dla algorithm
+    do {
+        // launch the kernel to set up the seed for each thread
+        setup_kernel<<<blocks, blockSize>>>(d_state, randomSeed * (over * 2));
+
+        // wait for the kernel to finish
+        cudaDeviceSynchronize();
+
+        // launch the kernel to perform the dla algorithm
         dla_kernel<<<blocks, blockSize>>>(grid, skipped, d_state, gridSize, maxIterations);
 
         // wait for the kernel to finish
@@ -192,10 +193,10 @@ int main(int argc, char* argv[]) {
         // get the number of overlapping particles
         over = calc_over(grid, gridSize);
 
-        // if there are more than 1024 overlapping particles
-        if (over > 1024) {
+        // if there are more than blocksize overlapping particles
+        if (over > blockSize) {
             // calculate the number of blocks
-            blocks = floor(over / 1024) + 1;
+            blocks = floor(over / blockSize) + 1;
             // calculate the number of threads per block
             blockSize = ceil(((float)over) / ((float)blocks));
         } else {
@@ -289,7 +290,7 @@ void saveImage(int* grid, int size) {
     for (i = 0; i < size; ++i)
         for (j = 0; j < size; ++j) {
             static unsigned char color[3];
-            switch (grid[j * size + i]) {
+            switch (grid[i * size + j]) {
                 case 0:           // empty spots
                     color[0] = 0; /* red */
                     color[1] = 0; /* green */

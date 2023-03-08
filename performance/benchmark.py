@@ -56,7 +56,7 @@ def clean_output(o, c):
     iterations = c.split()[3]
     skipped = int(o[o.find("skipped") + 8 : o.find(".", o.find("skipped"))])
     time = float(o[o.find("in seconds:") + 12 : o.find("in seconds:") + 20])
-    # type size particles iterations skipped time
+    # type size particles iterations skipped time num_process
     output = "{} {} {} {} {} {} {}".format(
         type, size, particles, iterations, skipped, time, num_process
     )

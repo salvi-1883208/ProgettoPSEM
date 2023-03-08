@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
             printf(" - Rank %d: %f seconds\n", p, (end - start));
         }
         // print the total time of execution (the time of the last process to finish)
-        printf("Total time of execution: %f seconds\n\n", last_process - start);
+        printf("Total time of execution in seconds: %f\n\n", last_process - start);
         // recieve and print the number of stuck particles from the last process
         int stuck;
         MPI_Recv(&stuck, 1, MPI_INT, MPI_ANY_SOURCE, 7, MPI_COMM_WORLD, MPI_STATUS_IGNORE);

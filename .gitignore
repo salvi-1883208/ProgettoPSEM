@@ -17,4 +17,5 @@ MPI/3D/main
 MPI/3D/matrix.txt
 MPI/3D/render
 performance/out.ppm
+3DRender/matrix.txt
 .vscode/

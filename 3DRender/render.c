@@ -3,16 +3,38 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
-int*** matrix;
 int size = 0;
+int* points;
+int lines = 0;
 
 int width = 2000, height = 1000;
 int lastX = -1, lastY = -1;
 float angleX = 0.0, angleY = 0.0;
 float distance = 10.0;
 
-int*** read_matrix_from_file(int* dim, char* filename) {
+int count_lines(char* filename) {
+    int count = 0;
+    char ch;
+    FILE* fp;
+
+    fp = fopen(filename, "r");
+    if (fp == NULL) {
+        printf("Error opening file!\n");
+        return 0;
+    }
+
+    while ((ch = fgetc(fp)) != EOF)
+        if (ch == '\n')
+            count++;
+
+    fclose(fp);
+    return count - 1;
+}
+
+// function that reads the points from the file and stores them in an array
+int* read_points_from_file(int* dim, char* filename) {
+    lines = count_lines(filename);
+
     FILE* fp = fopen(filename, "r");
     if (fp == NULL) {
         printf("Failed to open file for reading.\n");
@@ -20,29 +42,18 @@ int*** read_matrix_from_file(int* dim, char* filename) {
     }
     fscanf(fp, "%d", dim);
 
-    int ***matrix = (int ***)malloc((*dim) * sizeof(int **));
-    for (int i = 0; i < (*dim); i++) {
-        matrix[i] = (int **)malloc((*dim) * sizeof(int *));
-        for (int j = 0; j < (*dim); j++)
-            matrix[i][j] = (int *)calloc((*dim), sizeof(int));
-    }
-    
+    points = (int*)malloc(lines * 3 * sizeof(int));
     int x, y, z;
-    while (fscanf(fp, "%d %d %d", &x, &y, &z) != EOF) 
-        matrix[x][y][z] = 1;
-    
+    int i = 0;
+    while (fscanf(fp, "%d %d %d", &x, &y, &z) != EOF) {
+        points[i++] = x;
+        points[i++] = y;
+        points[i++] = z;
+    }
+
     fclose(fp);
-    return matrix;
-}
 
-
-void free_matrix(int*** matrix, int dim) {
-	for (int i = 0; i < dim; i++) {
-		for (int j = 0; j < dim; j++) 
-            free(matrix[i][j]);
-		free(matrix[i]);
-	}
-	free(matrix);
+    return points;
 }
 
 void display() {
@@ -54,53 +65,31 @@ void display() {
     glTranslatef(0.0, 0.0, -distance);
     glRotatef(angleY, 1.0, 0.0, 0.0);
     glRotatef(angleX, 0.0, 1.0, 0.0);
-    glTranslatef(-(size-1)/2.0, -(size-1)/2.0, -(size-1)/2.0);
-
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++) {
-            for (int k = 0; k < size; k++) {
-                glPushMatrix();
-                glTranslatef(i, j, k);
-                if(matrix[i][j][k]) {
-                    // Draw solid cube
-                    if(i == size / 2 && j == size / 2 && k == size / 2) {
-                        // Draw borders of cube using a blue wireframe
-                        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                        glColor3f(0.0, 0.0, 1.0);
-                        glLineWidth(2.0); // Set the line width to 2
-                        glutWireCube(size);
-
-                        // Reset polygon mode and color
-                        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                    }
-                    glColor3f(1.0, 1.0, 1.0); // Set the color of the cube faces to white
-                    glutSolidCube(0.99);
-
-                    // Draw wireframe cube
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                    glColor3f(0.5, 0.5, 0.5); // Set the color of the wireframe to gray
-                    glLineWidth(2.0); // Set the line width to 2
-                    glutWireCube(1.0);
-                    
-                    // Reset polygon mode and color
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                    glColor3f(1.0, 1.0, 1.0);
-                }
-                
-                glPopMatrix();
-            }
-        }
+    glTranslatef(-(size - 1) / 2.0, -(size - 1) / 2.0, -(size - 1) / 2.0);
+    // draw points
+    for (int i = 0; i < lines; i++) {
+        // Draw solid cube
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glPushMatrix();
+        glTranslatef(points[i * 3], points[i * 3 + 1], points[i * 3 + 2]);
+        glColor3f(1.0, 1.0, 1.0);
+        glutSolidCube(0.99);
+        // Draw wireframe cube
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glColor3f(0.5, 0.5, 0.5);  // Set the color of the wireframe to gray
+        glLineWidth(2.0);          // Set the line width to 2
+        glutWireCube(1.0);
+        glPopMatrix();
     }
-    glutSwapBuffers();
 
     // draw borders of matrix using a red cube
-    glLoadIdentity();
-    glTranslatef(-(size-1)/2.0, -(size-1)/2.0, -(size-1)/2.0);
-    glLineWidth(3.0); // set line width to 3
-    glColor3f(1.0, 0.0, 0.0); // set color to red
-    glutWireCube(size); // draw wireframe cube with size of matrix
+    // glLoadIdentity();
+    glTranslatef((size - 1) / 2.0, (size - 1) / 2.0, (size - 1) / 2.0);
+    glLineWidth(3.0);          // set line width to 3
+    glColor3f(0.0, 0.0, 1.0);  // set color to blue
+    glutWireCube(size);        // draw wireframe cube with size of matrix
+    glutSwapBuffers();
 }
-
 
 void mouse(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
@@ -108,11 +97,10 @@ void mouse(int button, int state, int x, int y) {
         lastY = y;
     }
     // Handle mouse wheel events
-    if (button == 3) { // Mouse wheel up
+    if (button == 3) {  // Mouse wheel up
         distance -= 2.0;
         glutPostRedisplay();
-    }
-    else if (button == 4) { // Mouse wheel down
+    } else if (button == 4) {  // Mouse wheel down
         distance += 2.0;
         glutPostRedisplay();
     }
@@ -129,11 +117,10 @@ void motion(int x, int y) {
 }
 
 void keyboard(unsigned char key, int x, int y) {
-    if (key == 'i') { // zoom in
+    if (key == 'i') {  // zoom in
         distance -= 2.0;
         glutPostRedisplay();
-    }
-    else if (key == 'o') { // zoom out
+    } else if (key == 'o') {  // zoom out
         distance += 2.0;
         glutPostRedisplay();
     }
@@ -141,7 +128,7 @@ void keyboard(unsigned char key, int x, int y) {
 
 int main(int argc, char** argv) {
     // load matrix from file
-    matrix = read_matrix_from_file(&size, "matrix.txt");
+    points = read_points_from_file(&size, "matrix.txt");
 
     distance = size * 1.3;
 
@@ -153,7 +140,7 @@ int main(int argc, char** argv) {
     glViewport(0, 0, width, height);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(45.0, (double) width / height, 0.1, (double) (size * 5));
+    gluPerspective(45.0, (double)width / height, 0.1, (double)(size * 5));
     glutDisplayFunc(display);
     glutMouseFunc(mouse);
     glutMotionFunc(motion);
@@ -161,8 +148,7 @@ int main(int argc, char** argv) {
     glEnable(GL_DEPTH_TEST);
     glutMainLoop();
 
-    free_matrix(matrix, size);
+    free(points);
 
     return 0;
 }
-

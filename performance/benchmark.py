@@ -36,7 +36,7 @@ def build_command(executable, size, coverage, iterations, seed, processors, rand
             *seed,
             rand
         )
-    return command
+    return (command, coverage)
 
 
 # run the command
@@ -47,24 +47,26 @@ def run_benchmark(command):
 
 
 # clean the output
-def clean_output(o, c):
+def clean_output(o, c, coverage):
     type = "s" if "serial" in c else "c" if "cuda" in c else "m"
     num_process = c.split()[2] if "mpi" in c else c.split()[6] if "cuda" in c else 1
     c = c[c.find("/") :]
     size = c.split()[1]
-    particles = c.split()[2]
+    particles = (
+        c.split()[2] if "cuda" not in c else (int(size) * int(size) * (coverage / 100))
+    )
     iterations = c.split()[3]
     skipped = int(o[o.find("skipped") + 8 : o.find(".", o.find("skipped"))])
     time = float(o[o.find("in seconds:") + 12 : o.find("in seconds:") + 20])
     # type size particles iterations skipped time num_process
     output = "{} {} {} {} {} {} {}".format(
-        type, size, particles, iterations, skipped, time, num_process
+        type, size, int(particles), iterations, skipped, time, num_process
     )
     return output
 
 
 # the different versions of the program
-executables = ["serial"]
+executables = ["cuda"]
 
 # in pixels
 sizes = [200, 400, 600]
@@ -79,7 +81,7 @@ iterations = [1000, 10000, 100000]
 rands = [1234, 5678, 9012, 3456]
 
 # number of processors
-processors_cuda = [128, 256, 512, 1024]
+processors_cuda = [139, 256, 777, 1024]
 processors_mpi = [2, 4, 5, 6]
 
 # starting seed
@@ -97,8 +99,8 @@ for executable in executables:
                         command = build_command(
                             executable, size, coverage, iteration, seed, 1, rand
                         )
-                        output = run_benchmark(command)
-                        results[command] = clean_output(output, command)
+                        output = run_benchmark(command[0])
+                        results[command] = clean_output(output, command[0], command[1])
                     elif "cuda" in executable:
                         for processor in processors_cuda:
                             command = build_command(
@@ -110,8 +112,10 @@ for executable in executables:
                                 processor,
                                 rand,
                             )
-                            output = run_benchmark(command)
-                            results[command] = clean_output(output, command)
+                            output = run_benchmark(command[0])
+                            results[command] = clean_output(
+                                output, command[0], command[1]
+                            )
                     else:
                         for processor in processors_mpi:
                             command = build_command(
@@ -123,11 +127,13 @@ for executable in executables:
                                 processor,
                                 rand,
                             )
-                            output = run_benchmark(command)
-                            results[command] = clean_output(output, command)
+                            output = run_benchmark(command[0])
+                            results[command] = clean_output(
+                                output, command[0], command[1]
+                            )
 
     # write the results to a file
-    with open("serial_results.csv", "w") as f:
+    with open("cuda_results.csv", "w") as f:
         f.write("type size particles iterations skipped time num_process\n")
         for command in results:
             f.write(results[command] + "\n")

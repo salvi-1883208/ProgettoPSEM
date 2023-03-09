@@ -40,16 +40,16 @@ The script takes as input the `csv` files and outputs two `csv` file with the fo
 
 - The `Time Parallel` column is the time it took to run the simulation using the parallel implementation.
 
-- The `Speedup` column is the speedup obtained by using the parallel implementation. The formula used is: $speedup = {serial \,\, time \over parallel\,\,time}$
+- The `Speedup` column is the speedup obtained by using the parallel implementation. The formula used is: `serial time / parallel time`.
 
 - The `Efficiency` column is the efficiency obtained by using the parallel implementation.
-	- For the MPI results, the formula used is: ${speedup \over num\,\,processes}$
-	- For the CUDA results, the number of processes is computed with: $ num\,\,threads\,\,per\,SM * num\,\,of\,SMs$. <br>The number of threads per SM is computed with: $max\,\,number\,\,of\,\,threads\,\,per\,\,SM \over block\,\,size$
+	- For the MPI results, the formula used is: `speedup / num process`.
+	- For the CUDA results, the number of processes is computed with: `num threads per SM * num of SMs`. <br>The number of threads per SM is computed with: `max number of threads per SM / block size`.
 
 The script also outputs two `png` file with the speedup and efficiency graphs, one for the cuda implementation and one for the MPI one.
 
 The graphs saved are made on a subset of the data, just to show it visually:
-- `Size` = 600
+- `Size` = 600`
 - `Iterations` = 100000
 They show the speedup and efficiency of the implementations as a function of the number of particles and number of processes.
 

@@ -49,7 +49,7 @@ The script takes as input the `csv` files and outputs two `csv` file with the fo
 The script also outputs two `png` file with the speedup and efficiency graphs, one for the cuda implementation and one for the MPI one.
 
 The graphs saved are made on a subset of the data, just to show it visually:
-- `Size` = 600`
+- `Size` = 600
 - `Iterations` = 100000
 They show the speedup and efficiency of the implementations as a function of the number of particles and number of processes.
 

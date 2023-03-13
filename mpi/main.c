@@ -1,10 +1,11 @@
 // MPI implementation of a DLA simulation
 #include <mpi.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 void move_particle(int *x, int *y, int m);
-int save_image(int *grid, int size);
+int save_image(bool *grid, int size);
 
 int main(int argc, char **argv) {
     // variables for the timing of the execution
@@ -22,7 +23,7 @@ int main(int argc, char **argv) {
     int grid_size, particles, max_steps, si, sj, random_seed;
 
     // the grid for each process
-    int *my_grid;
+    bool *my_grid;
 
     // get the grid size from the command line
     if (my_rank == 0) {
@@ -85,7 +86,7 @@ int main(int argc, char **argv) {
 
     // create a window for the grid and allocate it
     MPI_Win win;
-    MPI_Win_allocate(grid_size * grid_size * sizeof(int), sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &my_grid, &win);
+    MPI_Win_allocate(grid_size * grid_size * sizeof(bool), sizeof(bool), MPI_INFO_NULL, MPI_COMM_WORLD, &my_grid, &win);
 
     // place the seed particle
     my_grid[si * grid_size + sj] = 1;
@@ -137,16 +138,15 @@ int main(int argc, char **argv) {
                 my_grid[(my_x + 1) * grid_size + (my_y + 1)]) {  // bottom right
 
                 // if the particle is close to an already stuck particle, attach it to the grid
-                my_grid[my_x * grid_size + my_y]++;
+                my_grid[my_x * grid_size + my_y] = 1;
 
-                int one = 1;
-                // increment the number of stuck particles in this position for all processes
+                // make this particle stuck in this position for all processes
                 for (int p = 0; p < process_count; p++)
                     if (p != my_rank) {
                         // lock the window for the process p
                         MPI_Win_lock(MPI_LOCK_EXCLUSIVE, p, 0, win);
-                        // increment the number of stuck particles in this position for process p
-                        MPI_Accumulate(&one, 1, MPI_INT, p, my_x * grid_size + my_y, 1, MPI_INT, MPI_SUM, win);
+                        // make this particle stuck in this position for the process p
+                        MPI_Accumulate(&my_grid[my_x * grid_size + my_y], 1, MPI_C_BOOL, p, my_x * grid_size + my_y, 1, MPI_C_BOOL, MPI_REPLACE, win);
                         // flush and unlock the window for the process p
                         MPI_Win_flush(p, win);
                         MPI_Win_unlock(p, win);
@@ -163,16 +163,17 @@ int main(int argc, char **argv) {
         }
     }
     // variable to store the time of the last process to finish
-    double last_process = 0;
+    double last_process_time = 0;
 
     // time process end
     end = MPI_Wtime();
 
     // see who is the last process to finish
-    MPI_Allreduce(&end, &last_process, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    // this is also a barrier for all processes
+    MPI_Allreduce(&end, &last_process_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
     // if the last process, save the image
-    if (end == last_process) {
+    if (end == last_process_time) {
         // it has to be the last process because of how i implemented the RMA communication during the diffusion
         // (the last process to finish is the one that has the most up to date grid)
         int stuck = save_image(my_grid, grid_size);
@@ -188,7 +189,7 @@ int main(int argc, char **argv) {
             printf(" - Rank %d: %f seconds\n", p, (end - start));
         }
         // print the total time of execution (the time of the last process to finish)
-        printf("Total time of execution in seconds: %f\n\n", last_process - start);
+        printf("Total time of execution in seconds: %f\n\n", last_process_time - start);
         // recieve and print the number of stuck particles from the last process
         int stuck;
         MPI_Recv(&stuck, 1, MPI_INT, MPI_ANY_SOURCE, 7, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -241,7 +242,7 @@ void move_particle(int *x, int *y, int m) {
 }
 
 // save image to .ppm file
-int save_image(int *grid, int size) {
+int save_image(bool *grid, int size) {
     int count = 0;
     int i, j;
     FILE *fp = fopen("out.ppm", "wb"); /* b - binary mode */

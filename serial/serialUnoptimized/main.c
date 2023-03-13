@@ -156,38 +156,13 @@ int main(int argc, char const *argv[]) {
     return 0;
 }
 
+const int dx[] = {-1, 0, 1, 1, 1, 0, -1, -1};
+const int dy[] = {-1, -1, -1, 0, 1, 1, 1, 0};
+
 // move the particle in the random direction
 void move_particle(int *x, int *y, int m) {
-    switch (m) {
-        case 0:  // top left
-            (*x)--;
-            (*y)--;
-            break;
-        case 1:  // top
-            (*y)--;
-            break;
-        case 2:  // top right
-            (*x)++;
-            (*y)--;
-            break;
-        case 3:  // right
-            (*x)++;
-            break;
-        case 4:  // bottom right
-            (*x)++;
-            (*y)++;
-            break;
-        case 5:  // bottom
-            (*y)++;
-            break;
-        case 6:  // bottom left
-            (*x)--;
-            (*y)++;
-            break;
-        case 7:  // left
-            (*x)--;
-            break;
-    }
+    *x += dx[m];
+    *y += dy[m];
 }
 
 void saveImage(int **grid, int size) {

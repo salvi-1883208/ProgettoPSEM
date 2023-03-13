@@ -1,5 +1,4 @@
 # program to benchmark different version of DLA
-# size, particles, iterations
 import subprocess
 import math
 import time
@@ -66,12 +65,15 @@ def clean_output(o, c, coverage):
 
 
 # the different versions of the program
-executables = ["cuda"]
+# executables = ["serial", "cuda", "mpi"]
+executables = ["mpi"]
+# executables = ["serial"]
+# executables = ["cuda"]
 
 # in pixels
 sizes = [200, 400, 600]
 
-# in percent
+# percentage of the grid
 coverages = [5, 10, 15]
 
 # number of iterations
@@ -87,6 +89,11 @@ processors_mpi = [2, 4, 5, 6]
 # starting seed
 seed = (-1, -1)  # middle of the grid
 
+# file name
+filename = ""
+for executable in executables:
+    filename += executable + "_"
+filename += "results.csv"
 
 results = {}
 
@@ -133,7 +140,7 @@ for executable in executables:
                             )
 
     # write the results to a file
-    with open("cuda_results.csv", "w") as f:
+    with open("results/" + filename, "w") as f:
         f.write("type size particles iterations skipped time num_process\n")
         for command in results:
             f.write(results[command] + "\n")

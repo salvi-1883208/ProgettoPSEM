@@ -1,11 +1,12 @@
 // MPI implementation of a DLA simulation (3D)
 #include <mpi.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 void move_particle(int *x, int *y, int *z, int m);
-int write_matrix_to_file(int *matrix, int dim);
-int is_close_to_stuck(int *grid, int size, int x, int y, int z, int process_count, int my_rank, MPI_Win *win);
+int write_matrix_to_file(bool *matrix, int dim);
+int is_close_to_stuck(bool *grid, int size, int x, int y, int z, int process_count, int my_rank, MPI_Win *win);
 int main(int argc, char **argv) {
     // variables for the timing of the execution
     double start, end;
@@ -22,7 +23,7 @@ int main(int argc, char **argv) {
     int grid_size, particles, max_steps, si, sj, sk, random_seed;
 
     // the grid for each process
-    int *my_grid;
+    bool *my_grid;
 
     // get the grid size from the command line
     if (my_rank == 0) {
@@ -89,7 +90,7 @@ int main(int argc, char **argv) {
 
     // create a window for the grid and allocate it
     MPI_Win win;
-    MPI_Win_allocate(grid_size * grid_size * grid_size * sizeof(int), sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &my_grid, &win);
+    MPI_Win_allocate(grid_size * grid_size * grid_size * sizeof(bool), sizeof(bool), MPI_INFO_NULL, MPI_COMM_WORLD, &my_grid, &win);
 
     // place the seed particle
     my_grid[si * grid_size * grid_size + sj * grid_size + sk] = 1;
@@ -190,22 +191,21 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-int is_close_to_stuck(int *grid, int size, int x, int y, int z, int process_count, int my_rank, MPI_Win *win) {
+int is_close_to_stuck(bool *grid, int size, int x, int y, int z, int process_count, int my_rank, MPI_Win *win) {
     for (int i = -1; i <= 1; i++)
         for (int j = -1; j <= 1; j++)
             for (int k = -1; k <= 1; k++)
                 if (grid[(x + i) * size * size + (y + j) * size + (z + k)]) {
                     // if the particle is close to an already stuck particle, attach it to the grid
-                    grid[x * size * size + y * size + z]++;
+                    grid[x * size * size + y * size + z] = 1;
 
-                    int one = 1;
                     // increment the number of stuck particles in this position for all processes
                     for (int p = 0; p < process_count; p++)
                         if (p != my_rank) {
                             // lock the window for the process p
                             MPI_Win_lock(MPI_LOCK_EXCLUSIVE, p, 0, *win);
-                            // increment the number of stuck particles in this position for process p
-                            MPI_Accumulate(&one, 1, MPI_INT, p, x * size * size + y * size + z, 1, MPI_INT, MPI_SUM, *win);
+                            // make this particle stuck in this position for the process (replace)
+                            MPI_Accumulate(&grid[x * size * size + y * size + z * size], 1, MPI_C_BOOL, p, x * size * size + y * size + z * size, 1, MPI_C_BOOL, MPI_REPLACE, *win);
                             // flush and unlock the window for the process p
                             MPI_Win_flush(p, *win);
                             MPI_Win_unlock(p, *win);
@@ -217,7 +217,7 @@ int is_close_to_stuck(int *grid, int size, int x, int y, int z, int process_coun
 }
 
 // save the grid to a file
-int write_matrix_to_file(int *matrix, int dim) {
+int write_matrix_to_file(bool *matrix, int dim) {
     int count = 0;
     FILE *fp = fopen("matrix.txt", "w");
     if (fp == NULL) {

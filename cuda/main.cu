@@ -3,6 +3,7 @@
 #include <curand.h>
 #include <curand_kernel.h>
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -11,11 +12,11 @@
 // move the particle in the random direction
 __device__ void move_particle(int* x, int* y, int m);
 
-// calculate the number of overlapping particles
-int calc_over(int* grid, int size);
+// atomi CAS for bool
+static __inline__ __device__ bool atomicCAS(bool* address, bool compare, bool val);
 
 // save the grid as a .ppm image
-void saveImage(int* grid, int size);
+int saveImage(bool* grid, int size);
 
 // kernel to set up the seed for each thread
 __global__ void setup_kernel(curandState* state, int randomSeed) {
@@ -24,9 +25,8 @@ __global__ void setup_kernel(curandState* state, int randomSeed) {
     curand_init(randomSeed, id, 0, &state[id]);
 }
 
-// kernel to perform the dla algorithm
-__global__ void dla_kernel(int* grid, int* skipped, curandState* state,
-                           int gridSize, int maxIterations) {
+// kernel to perform the diffusion
+__global__ void dla_kernel(bool* grid, curandState* state, int gridSize, int maxIterations) {
     // calculate thread id
     int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -37,19 +37,19 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state,
     int x;
     int y;
 
+    // initialize the counter for the number of iterations
+    int i = 0;
+
     // if the particle has been generated on a stuck particle, generate a new
     // position
     do {
         x = curand(&localState) % gridSize;
         y = curand(&localState) % gridSize;
-    } while (grid[x * gridSize + y]);
-
-    // initialize the counter for the number of iterations
-    int i = 0;
+    } while (grid[x * gridSize + y] && i <= maxIterations);
 
     // iterate until the particle is attached to the grid or it did more than
     // maxIterations number of iterations
-    while ((i <= maxIterations)) {
+    while (i <= maxIterations) {
         // if the particle is outside the grid, move it back inside
         if (x < 1)
             x = 1;
@@ -71,25 +71,22 @@ __global__ void dla_kernel(int* grid, int* skipped, curandState* state,
             grid[(x + 1) * gridSize + (y + 1)]) {  // bottom right
 
             // if the particle is close to an already stuck particle, attach it to the grid
-            // (using atomicAdd to count the overlapping particles)
-            atomicAdd(&grid[x * gridSize + y], 1);
+            atomicCAS(&grid[x * gridSize + y], 0, 1);
 
             return;
         }
 
-        // calculate the random direction of the particle
-        int dir = curand(&localState) % 8;
-
+        // calculate the random direction of the particle and
         // move the particle in the random direction
-        move_particle(&x, &y, dir);
+        move_particle(&x, &y, curand(&localState) % 8);
 
         // increment the number of iterations
         i++;
     }
-
     // if the particle did more than MAX_ITER number of iterations, skip it
-    // if I remove this it doesn't work, probably because of in warp divergence
-    atomicAdd(skipped, 1);
+
+    // I have to do this because of warp divergence, if I remove this it won't work
+    __syncwarp();
 
     return;
 }
@@ -98,7 +95,10 @@ int main(int argc, char* argv[]) {
     // command line input: grid size, number of particles, number of steps, seed
     // coordinates, block size, random seed
     if ((argc) < 6) {
-        printf("Arguments are: square grid size, number of particles times block size, number of maximum steps, seed coordinates, the number of threads per block, seed for the curand() function.\n");
+        printf(
+            "Arguments are: square grid size, number of particles times block "
+            "size, number of maximum steps, seed coordinates, the number of "
+            "threads per block, seed for the curand() function.\n");
         return -1;
     }
 
@@ -148,23 +148,16 @@ int main(int argc, char* argv[]) {
     int blocks = (numParticles + blockSize - 1) / blockSize;
 
     // allocate the grid for both the host and the device
-    int* grid;
-    cudaMallocManaged((void**)&grid, gridSize * gridSize * sizeof(int),
-                      cudaMemAttachGlobal);
+    bool* grid;
+    cudaMallocManaged((void**)&grid, gridSize * gridSize * sizeof(bool), cudaMemAttachGlobal);
 
     // initialize the grid
     for (int i = 0; i < gridSize; i++)
-        for (int j = 0; j < gridSize; j++) grid[i * gridSize + j] = 0;
+        for (int j = 0; j < gridSize; j++)
+            grid[i * gridSize + j] = 0;
 
     // place the seed in si, sj
     grid[si * gridSize + sj] = 1;
-
-    // allocate the skipped counter for both the host and the device
-    int* skipped;
-    cudaMallocManaged((void**)&skipped, sizeof(int), cudaMemAttachGlobal);
-
-    // initialize the skipped counter
-    *skipped = 0;
 
     // allocate the array of the random states in the device memory
     curandState* d_state;
@@ -179,40 +172,19 @@ int main(int argc, char* argv[]) {
     cudaEventCreate(&stop);
     cudaEventRecord(start, 0);
 
-    // initialize the number of overlapping particles
-    int over = 1;
+    // this implementation ignores the overlapping particles
 
-    // this implementation ignores the overlapping particles and re-launches them until there are none
-    do {
-        // launch the kernel to set up the seed for each thread
-        setup_kernel<<<blocks, blockSize>>>(d_state, randomSeed * (over * 2));
+    // launch the kernel to set up the seed for each thread
+    setup_kernel<<<blocks, blockSize>>>(d_state, randomSeed);
 
-        // wait for the kernel to finish
-        cudaDeviceSynchronize();
+    // wait for the kernel to finish
+    cudaDeviceSynchronize();
 
-        // launch the kernel to perform the dla algorithm
-        dla_kernel<<<blocks, blockSize>>>(grid, skipped, d_state, gridSize, maxIterations);
+    // launch the kernel to perform the dla algorithm
+    dla_kernel<<<blocks, blockSize>>>(grid, d_state, gridSize, maxIterations);
 
-        // wait for the kernel to finish
-        cudaDeviceSynchronize();
-
-        // get the number of overlapping particles
-        over = calc_over(grid, gridSize);
-
-        // if there are more than blocksize overlapping particles
-        if (over > blockSize) {
-            // calculate the number of blocks
-            blocks = floor(over / blockSize) + 1;
-            // calculate the number of threads per block
-            blockSize = ceil(((float)over) / ((float)blocks));
-        } else {
-            // else run only one block with just overlapping threads
-            blocks = 1;
-            blockSize = over;
-        }
-        // if there are overlapping particles launch the kernel again until there
-        // are none
-    } while (over > 0);
+    // wait for the kernel to finish
+    cudaDeviceSynchronize();
 
     // stop the timer
     cudaEventRecord(stop, 0);
@@ -221,39 +193,21 @@ int main(int argc, char* argv[]) {
 
     printf("Simulation finished.\n\n");
 
+    // save the grid as a .ppm image and get the number of stuck particles
+    int stuck = saveImage(grid, gridSize);
+
     // print the number of skipped particles
     printf("Of %d particles:\n - drawn %d,\n - skipped %d.\n\n", numParticles,
-           numParticles - *skipped, *skipped);
+           stuck, numParticles - stuck);
 
     // print the time to simulate in seconds
     printf("Execution time in seconds: %f\n", time / 1000);
 
-    // save the grid as a .ppm image and get the number of skipped particles
-    saveImage(grid, gridSize);
-
     // free the memory
     cudaFree(grid);
-    cudaFree(skipped);
     cudaFree(d_state);
 
     return 0;
-}
-
-// calculate the number of overlapping particles
-int calc_over(int* grid, int size) {
-    // initialize the counter
-    int tot = 0;
-    // iterate over the whole grid
-    for (int i = 0; i < size; ++i)
-        for (int j = 0; j < size; ++j)
-            // if the particle is overlapping
-            if (grid[i * size + j] > 1) {
-                // increment the counter
-                tot += grid[i * size + j] - 1;
-                // set the particle as stuck and not overlapping anymore
-                grid[i * size + j] = 1;
-            }
-    return tot;
 }
 
 // move the particle in the random direction
@@ -290,8 +244,9 @@ __device__ void move_particle(int* x, int* y, int m) {
     }
 }
 
-void saveImage(int* grid, int size) {
-    // save image to .ppm file
+// save image to .ppm file
+int saveImage(bool* grid, int size) {
+    int count = 0;
     int i, j;
     FILE* fp = fopen(IMG_NAME, "wb"); /* b - binary mode */
     (void)fprintf(fp, "P6\n%d %d\n255\n", size, size);
@@ -308,10 +263,37 @@ void saveImage(int* grid, int size) {
                     color[0] = 255; /* red */
                     color[1] = 255; /* green */
                     color[2] = 255; /* blue */
+                    count++;
                     break;
             }
             (void)fwrite(color, 1, 3, fp);
         }
     (void)fclose(fp);
-    return;
+    return count;
+}
+
+// copied from stackoverflow
+static __inline__ __device__ bool atomicCAS(bool* address, bool compare, bool val) {
+    unsigned long long addr = (unsigned long long)address;
+    unsigned pos = addr & 3;             // byte position within the int
+    int* int_addr = (int*)(addr - pos);  // int-aligned address
+    int old = *int_addr, assumed, ival;
+
+    bool current_value;
+
+    do {
+        current_value = (bool)(old & ((0xFFU) << (8 * pos)));
+
+        if (current_value != compare)  // If we expected that bool to be different, then
+            break;                     // stop trying to update it and just return it's current value
+
+        assumed = old;
+        if (val)
+            ival = old | (1 << (8 * pos));
+        else
+            ival = old & (~((0xFFU) << (8 * pos)));
+        old = atomicCAS(int_addr, assumed, ival);
+    } while (assumed != old);
+
+    return current_value;
 }

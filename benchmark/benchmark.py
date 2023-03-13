@@ -66,9 +66,9 @@ def clean_output(o, c, coverage):
 
 # the different versions of the program
 # executables = ["serial", "cuda", "mpi"]
-executables = ["mpi"]
-# executables = ["serial"]
-# executables = ["cuda"]
+input = input("Enter the version to benchmark (c: cuda, s: serial, m: mpi): ")
+
+executable = "cuda" if input == "c" else "serial" if input == "s" else "mpi"
 
 # in pixels
 sizes = [200, 400, 600]
@@ -90,57 +90,49 @@ processors_mpi = [2, 4, 5, 6]
 seed = (-1, -1)  # middle of the grid
 
 # file name
-filename = ""
-for executable in executables:
-    filename += executable + "_"
-filename += "results.csv"
+filename = executable + "_" + "results.csv"
 
 results = {}
 
-for executable in executables:
-    for size in sizes:
-        for coverage in coverages:
-            for iteration in iterations:
-                for rand in rands:
-                    if "serial" in executable:
+for size in sizes:
+    for coverage in coverages:
+        for iteration in iterations:
+            for rand in rands:
+                if "serial" in executable:
+                    command = build_command(
+                        executable, size, coverage, iteration, seed, 1, rand
+                    )
+                    output = run_benchmark(command[0])
+                    results[command] = clean_output(output, command[0], command[1])
+                elif "cuda" in executable:
+                    for processor in processors_cuda:
                         command = build_command(
-                            executable, size, coverage, iteration, seed, 1, rand
+                            executable,
+                            size,
+                            coverage,
+                            iteration,
+                            seed,
+                            processor,
+                            rand,
                         )
                         output = run_benchmark(command[0])
                         results[command] = clean_output(output, command[0], command[1])
-                    elif "cuda" in executable:
-                        for processor in processors_cuda:
-                            command = build_command(
-                                executable,
-                                size,
-                                coverage,
-                                iteration,
-                                seed,
-                                processor,
-                                rand,
-                            )
-                            output = run_benchmark(command[0])
-                            results[command] = clean_output(
-                                output, command[0], command[1]
-                            )
-                    else:
-                        for processor in processors_mpi:
-                            command = build_command(
-                                executable,
-                                size,
-                                coverage,
-                                iteration,
-                                seed,
-                                processor,
-                                rand,
-                            )
-                            output = run_benchmark(command[0])
-                            results[command] = clean_output(
-                                output, command[0], command[1]
-                            )
+                else:
+                    for processor in processors_mpi:
+                        command = build_command(
+                            executable,
+                            size,
+                            coverage,
+                            iteration,
+                            seed,
+                            processor,
+                            rand,
+                        )
+                        output = run_benchmark(command[0])
+                        results[command] = clean_output(output, command[0], command[1])
 
-    # write the results to a file
-    with open("results/" + filename, "w") as f:
-        f.write("type size particles iterations skipped time num_process\n")
-        for command in results:
-            f.write(results[command] + "\n")
+# write the results to a file
+with open("results/" + filename, "w") as f:
+    f.write("type size particles iterations skipped time num_process\n")
+    for command in results:
+        f.write(results[command] + "\n")

@@ -45,20 +45,14 @@ __global__ void dla_kernel(bool* grid, curandState* state, int gridSize, int max
     do {
         x = curand(&localState) % gridSize;
         y = curand(&localState) % gridSize;
-    } while (grid[x * gridSize + y] && i <= maxIterations);
+    } while (grid[x * gridSize + y] && i++ < maxIterations);
 
     // iterate until the particle is attached to the grid or it did more than
     // maxIterations number of iterations
-    while (i <= maxIterations) {
-        // if the particle is outside the grid, move it back inside
-        if (x < 1)
-            x = 1;
-        else if (x > gridSize - 2)
-            x = gridSize - 2;
-        if (y < 1)
-            y = 1;
-        else if (y > gridSize - 2)
-            y = gridSize - 2;
+    while (i++ < maxIterations) {
+        // if the particle is outside the grid, move it back insid
+        x = min(max(x, 1), gridSize - 2);
+        y = min(max(y, 1), gridSize - 2);
 
         // if the particle is close to an already stuck particle
         if (grid[(x - 1) * gridSize + (y - 1)] ||  // top left
@@ -79,9 +73,6 @@ __global__ void dla_kernel(bool* grid, curandState* state, int gridSize, int max
         // calculate the random direction of the particle and
         // move the particle in the random direction
         move_particle(&x, &y, curand(&localState) % 8);
-
-        // increment the number of iterations
-        i++;
     }
     // if the particle did more than MAX_ITER number of iterations, skip it
 

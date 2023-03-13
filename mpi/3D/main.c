@@ -205,7 +205,7 @@ int is_close_to_stuck(bool *grid, int size, int x, int y, int z, int process_cou
                             // lock the window for the process p
                             MPI_Win_lock(MPI_LOCK_EXCLUSIVE, p, 0, *win);
                             // make this particle stuck in this position for the process (replace)
-                            MPI_Accumulate(&grid[x * size * size + y * size + z * size], 1, MPI_C_BOOL, p, x * size * size + y * size + z * size, 1, MPI_C_BOOL, MPI_REPLACE, *win);
+                            MPI_Accumulate(&grid[x * size * size + y * size + z], 1, MPI_C_BOOL, p, x * size * size + y * size + z, 1, MPI_C_BOOL, MPI_REPLACE, *win);
                             // flush and unlock the window for the process p
                             MPI_Win_flush(p, *win);
                             MPI_Win_unlock(p, *win);
@@ -214,6 +214,18 @@ int is_close_to_stuck(bool *grid, int size, int x, int y, int z, int process_cou
                     return 1;
                 }
     return 0;
+}
+
+// define the offsets for the 26 directions
+const int dx[26] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0};
+const int dy[26] = {-1, -1, -1, 0, 0, 0, 1, 1, 1, -1, -1, -1, 0, 0, -1, -1, -1, 0, 0, 0, 1, 1, 1, 1, 1, 1};
+const int dz[26] = {-1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1};
+
+// move the particle in the random direction (out of 26)
+void move_particle(int *x, int *y, int *z, int m) {
+    (*x) += dx[m];
+    (*y) += dy[m];
+    (*z) += dz[m];
 }
 
 // save the grid to a file
@@ -236,116 +248,4 @@ int write_matrix_to_file(bool *matrix, int dim) {
 
     fclose(fp);
     return count;
-}
-
-// move the particle in the random direction
-void move_particle(int *x, int *y, int *z, int m) {
-    switch (m) {
-        case 0:
-            (*x)--;
-            (*y)--;
-            (*z)--;
-            break;
-        case 1:
-            (*x)--;
-            (*y)--;
-            break;
-        case 2:
-            (*x)--;
-            (*y)--;
-            (*z)++;
-            break;
-        case 3:
-            (*x)--;
-            (*z)--;
-            break;
-        case 4:
-            (*x)--;
-            break;
-        case 5:
-            (*x)--;
-            (*z)++;
-            break;
-        case 6:
-            (*x)--;
-            (*y)++;
-            (*z)--;
-            break;
-        case 7:
-            (*x)--;
-            (*y)++;
-            break;
-        case 8:
-            (*x)--;
-            (*y)++;
-            (*z)++;
-            break;
-        case 9:
-            (*y)--;
-            (*z)--;
-            break;
-        case 10:
-            (*y)--;
-            break;
-        case 11:
-            (*y)--;
-            (*z)++;
-            break;
-        case 12:
-            (*z)--;
-            break;
-        case 13:
-            (*z)++;
-            break;
-        case 14:
-            (*x)++;
-            (*y)--;
-            (*z)--;
-            break;
-        case 15:
-            (*x)++;
-            (*y)--;
-            break;
-        case 16:
-            (*x)++;
-            (*y)--;
-            (*z)++;
-            break;
-        case 17:
-            (*x)++;
-            (*z)--;
-            break;
-        case 18:
-            (*x)++;
-            break;
-        case 19:
-            (*x)++;
-            (*z)++;
-            break;
-        case 20:
-            (*x)++;
-            (*y)++;
-            (*z)--;
-            break;
-        case 21:
-            (*x)++;
-            (*y)++;
-            break;
-        case 22:
-            (*x)++;
-            (*y)++;
-            (*z)++;
-            break;
-        case 23:
-            (*y)++;
-            (*z)--;
-            break;
-        case 24:
-            (*y)++;
-            break;
-        case 25:
-            (*y)++;
-            (*z)++;
-            break;
-    }
 }

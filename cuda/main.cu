@@ -210,38 +210,13 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+__device__ const int dx[] = {-1, 0, 1, 1, 1, 0, -1, -1};
+__device__ const int dy[] = {-1, -1, -1, 0, 1, 1, 1, 0};
+
 // move the particle in the random direction
 __device__ void move_particle(int* x, int* y, int m) {
-    switch (m) {
-        case 0:  // top left
-            (*x)--;
-            (*y)--;
-            break;
-        case 1:  // top
-            (*y)--;
-            break;
-        case 2:  // top right
-            (*x)++;
-            (*y)--;
-            break;
-        case 3:  // right
-            (*x)++;
-            break;
-        case 4:  // bottom right
-            (*x)++;
-            (*y)++;
-            break;
-        case 5:  // bottom
-            (*y)++;
-            break;
-        case 6:  // bottom left
-            (*x)--;
-            (*y)++;
-            break;
-        case 7:  // left
-            (*x)--;
-            break;
-    }
+    *x += dx[m];
+    *y += dy[m];
 }
 
 // save image to .ppm file

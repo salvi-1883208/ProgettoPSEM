@@ -74,14 +74,14 @@ int main(int argc, char const *argv[]) {
         int x;
         int y;
 
+        // number of iterations
+        int i = 0;
+
         // if the particle has been generated on a stuck particle, generate a new position
         do {
             x = random() % gridSize;
             y = random() % gridSize;
-        } while (grid[x][y]);
-
-        // number of iterations
-        int i = 0;
+        } while (grid[x][y] && i++ < iterations);
 
         while (i < iterations) {
             // if the particle is outside the grid, move it back inside

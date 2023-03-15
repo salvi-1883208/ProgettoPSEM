@@ -18,4 +18,5 @@ mpi/3D/matrix.txt
 mpi/3D/render
 benchmark/out.ppm
 3DRender/matrix.txt
+benchmark/executables/out.ppm
 .vscode/

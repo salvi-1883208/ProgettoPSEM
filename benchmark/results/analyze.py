@@ -163,84 +163,147 @@ merged_serial_mpi["speedup"] = (
 # compute the efficiency
 merged_serial_mpi["efficiency"] = (
     merged_serial_mpi["speedup"] / merged_serial_mpi["num_process_mpi"]
-).round(decimals=4)
+).round(decimals=2)
 
 # Write the merged data to a new CSV file
 merged_serial_mpi.to_csv("analyzed/merged_serial_mpi_results.csv", index=False)
 
-# draw histogram for the serial and cuda data for the 600 size and 100000 iterations
-# showing on the x axis the number of particles and the number of threads, on the y axis the speedup
-histogram_serial_cuda = merged_serial_cuda[
-    (merged_serial_cuda["size"] == 600) & (merged_serial_cuda["iterations"] == 100000)
-].copy()
+# get the different number of iterations, size and number of processes
+iterations = merged_serial_cuda["iterations"].unique()
+size = merged_serial_cuda["size"].unique()
+num_process = merged_serial_cuda["num_process_cuda"].unique()
 
-# combine the particles and num_process columns into a new column for the x-axis labels
-histogram_serial_cuda.loc[
-    :, "particles and num processes"
-] = histogram_serial_cuda.apply(
-    lambda row: f"{int(row['particles'])}\n{int(row['num_process_cuda'])}", axis=1
-)
+se = ["speedup", "efficiency"]
+# create a histogram for each combination of iterations and size (cuda speedup and efficiency)
+for v in se:
+    for iteration in iterations:
+        for s in size:
+            # create a new dataframe with the data for the current combination
+            histogram_serial_cuda = merged_serial_cuda[
+                (merged_serial_cuda["iterations"] == iteration)
+                & (merged_serial_cuda["size"] == s)
+            ].copy()
 
-# plot the histogram
-histogram_serial_cuda.plot(
-    kind="bar",
-    x="particles and num processes",
-    y=["speedup"],
-    title="Histogram for the cuda speedup for the 600 size and 100000 iterations",
-    figsize=(20, 10),
-)
-# rotate the labels on the x-axis
-plt.xticks(rotation=0)
+            particles = histogram_serial_cuda["particles"].unique()
 
-# save the plot
-plt.savefig("analyzed/graphs/cuda/speedup_cuda_600_100000.png")
+            x = np.arange(len(particles))  # the label locations
+            width = 0.15  # the width of the bars
 
-# the same but for the efficiency
-histogram_serial_cuda.plot(
-    kind="bar",
-    x="particles and num processes",
-    y=["efficiency"],
-    title="Histogram for the cuda efficiency for the 600 size and 100000 iterations",
-    figsize=(20, 10),
-)
-# rotate the labels on the x-axis
-plt.xticks(rotation=0)
-# save the plot
-plt.savefig("analyzed/graphs/cuda/efficiency_cuda_600_100000.png")
+            fig, ax = plt.subplots(layout="constrained")
+            multiplier = 0
 
-# draw histogram for the serial and mpi data for the 600 size and 100000 iterations
-# showing on the x axis the number of particles and the number of processes, on the y axis the speedup
-histogram_serial_mpi = merged_serial_mpi[
-    (merged_serial_mpi["size"] == 600) & (merged_serial_mpi["iterations"] == 100000)
-].copy()
+            # for each number of particles create a group of bars
+            for i in range(len(particles)):
+                # for each number of processes create a bar
+                for j in range(len(num_process)):
+                    # get the data for the current number of particles and processes
+                    data = histogram_serial_cuda[
+                        (histogram_serial_cuda["particles"] == particles[i])
+                        & (histogram_serial_cuda["num_process_cuda"] == num_process[j])
+                    ]
+                    # get the speedup
+                    speedup = data[v].values[0]
+                    colors = ["tab:blue", "tab:orange", "tab:green", "tab:red"]
+                    offset = width * multiplier
+                    # plot the bar without duplicating the label and color
+                    if i == 0:
+                        rect = ax.bar(
+                            x[i] - width + j * width + offset,
+                            speedup,
+                            width,
+                            label=f"{num_process[j]} threads",
+                            color=colors[j],
+                        )
+                    else:
+                        rect = ax.bar(
+                            x[i] - width + j * width + offset,
+                            speedup,
+                            width,
+                            color=colors[j],
+                        )
+                    ax.bar_label(rect, padding=3)
+                multiplier += 1
+            # Add some text for labels, title and custom x-axis tick labels, etc.
+            ax.set_ylabel(v.capitalize())
+            ax.set_xlabel("Number of particles")
+            ax.set_title(
+                f"{v.capitalize()} for {s}x{s} grid and {iteration} iterations (CUDA)"
+            )
+            ax.set_xticks([width - width / 2, width * 8.2])
+            ax.set_xticklabels(particles)
+            ax.set_ylim(0, 1.3 * max(histogram_serial_cuda[v]))
+            ax.legend(ncol=len(num_process), loc="upper left")
+            fig.set_size_inches(10, 6)
+            # save the plot
+            plt.savefig(f"analyzed/graphs/cuda/{v}/{s}_{iteration}.png")
+            plt.close()
 
-# combine the particles and num_process columns into a new column for the x-axis labels
-histogram_serial_mpi.loc[:, "particles and num processes"] = histogram_serial_mpi.apply(
-    lambda row: f"{int(row['particles'])}\n{int(row['num_process_mpi'])}", axis=1
-)
 
-# plot the histogram
-histogram_serial_mpi.plot(
-    kind="bar",
-    x="particles and num processes",
-    y=["speedup"],
-    title="Histogram for the mpi speedup for the 600 size and 100000 iterations",
-    figsize=(20, 10),
-)
-# rotate the labels on the x-axis
-plt.xticks(rotation=0)
-# save the plot
-plt.savefig("analyzed/graphs/mpi/speedup_mpi_600_100000.png")
+# get the different number of iterations, size and number of processes
+iterations = merged_serial_mpi["iterations"].unique()
+size = merged_serial_mpi["size"].unique()
+num_process = merged_serial_mpi["num_process_mpi"].unique()
 
-# the same but for the efficiency
-histogram_serial_mpi.plot(
-    kind="bar",
-    x="particles and num processes",
-    y=["efficiency"],
-    title="Histogram for the mpi efficiency for the 600 size and 100000 iterations",
-    figsize=(20, 10),
-)
-# rotate the labels on the x-axis
-plt.xticks(rotation=0)
-# save the plot
-plt.savefig("analyzed/graphs/mpi/efficiency_mpi_600_100000.png")
+# create a histogram for each combination of iterations and size (mpi speedup and efficiency)
+for v in se:
+    for iteration in iterations:
+        for s in size:
+            # create a new dataframe with the data for the current combination
+            histogram_serial_mpi = merged_serial_mpi[
+                (merged_serial_mpi["iterations"] == iteration)
+                & (merged_serial_mpi["size"] == s)
+            ].copy()
+
+            particles = histogram_serial_mpi["particles"].unique()
+
+            x = np.arange(len(particles))
+            width = 0.15
+
+            fig, ax = plt.subplots(layout="constrained")
+            multiplier = 0
+
+            # for each number of particles create a group of bars
+            for i in range(len(particles)):
+                # for each number of processes create a bar
+                for j in range(len(num_process)):
+                    # get the data for the current number of particles and processes
+                    data = histogram_serial_mpi[
+                        (histogram_serial_mpi["particles"] == particles[i])
+                        & (histogram_serial_mpi["num_process_mpi"] == num_process[j])
+                    ]
+                    # get the speedup
+                    speedup = data[v].values[0]
+                    colors = ["tab:blue", "tab:orange", "tab:green", "tab:red"]
+                    offset = width * multiplier
+                    # plot the bar without duplicating the label and color
+                    if i == 0:
+                        rect = ax.bar(
+                            x[i] - width + j * width + offset,
+                            speedup,
+                            width,
+                            label=f"{num_process[j]} processes",
+                            color=colors[j],
+                        )
+                    else:
+                        rect = ax.bar(
+                            x[i] - width + j * width + offset,
+                            speedup,
+                            width,
+                            color=colors[j],
+                        )
+                    ax.bar_label(rect, padding=3)
+                multiplier += 1
+            # Add some text for labels, title and custom x-axis tick labels, etc.
+            ax.set_ylabel(v.capitalize())
+            ax.set_xlabel("Number of particles")
+            ax.set_title(
+                f"{v.capitalize()} for {s}x{s} grid and {iteration} iterations (MPI)"
+            )
+            ax.set_xticks([width - width / 2, width * 8.2])
+            ax.set_xticklabels(particles)
+            ax.set_ylim(0, 1.3 * max(histogram_serial_mpi[v]))
+            ax.legend(ncol=len(num_process), loc="upper left")
+            fig.set_size_inches(10, 6)
+            # save the plot
+            plt.savefig(f"analyzed/graphs/mpi/{v}/{s}_{iteration}.png")
+            plt.close()

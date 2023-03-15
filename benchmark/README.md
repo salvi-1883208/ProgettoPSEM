@@ -15,3 +15,5 @@ In the `executables` folder there are the executables for the various implementa
 
 To run the benchmark, simply run `python3 benchmark.py` in this folder.
 <br>
+
+In the `results` folder there is a script `analyze.py` that can be used to analyze the results of the benchmark.

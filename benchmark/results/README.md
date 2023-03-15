@@ -30,7 +30,7 @@ The script takes as input the `csv` files and outputs two `csv` file with the fo
 
 | Size | Particles | Iterations | Num Processes|Time Serial | Time Parallel |  Speedup | Efficiency |
 |------|-----------|------------|--------------|------------|---------------|----------|------------|
-600|54000|100000|4|30.1045|20.735|1.45|0.3625
+700|49000|100000|6,50|8853|26.6812|1.91|0.32
 
 - The `Num Processes` column is the number of processes used to run the simulation: 
 	- In `merged_serial_cuda_results.csv` it is the size of the blocks of the kernel that computes the diffusion.
@@ -46,14 +46,19 @@ The script takes as input the `csv` files and outputs two `csv` file with the fo
 	- For the MPI results, the formula used is: `speedup / num process`.
 	- For the CUDA results, the number of processes is computed with: `num threads per SM * num of SMs`. <br>The number of threads per SM is computed with: `max number of threads per SM / block size`.
 
-The script also outputs two `png` file with the speedup and efficiency graphs, one for the cuda implementation and one for the MPI one.
+## Graphs
+The script also generates graphs of the speedup and efficiency obtained by using the parallel implementations.
 
-The graphs saved are made on a subset of the data, just to show it visually:
-- `Size` = 600
-- `Iterations` = 100000
-They show the speedup and efficiency of the implementations as a function of the number of particles and number of processes.
+The graps are saved with the following structure: `graphs/{type}/{graph}/{size}_{iterations}.png`, where:
+- `type` is the type of the implementation used. It can be either `mpi` for the MPI implementation or `cuda` for the cuda implementation.
+- `graph` is the type of the graph. It can be either `speedup` or `efficiency`.
+- `size` is the size of the grid used.
+- `iterations` is the maximum number of iterations permitted for each particle.
 
-Example of the speedup graph of the MPI implementation:
+##
+
+
+Example of a graph of the speedup obtained by using the MPI implementation with a grid of size 700 and 100000 iterations per particle:
 <br>
 <br>
-![Speedup MPI](/performance/results/analyzed/graphs/mpi/speedup_mpi_600_100000.png)
+![Speedup MPI](/benchmark/results/analyzed/graphs/mpi/speedup/700_100000.png)

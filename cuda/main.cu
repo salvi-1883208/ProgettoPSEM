@@ -134,7 +134,7 @@ int main(int argc, char* argv[]) {
     // calculate the number of blocks
     int blocks = (numParticles + blockSize - 1) / blockSize;
 
-    // allocate the grid for both the host and the device
+    // allocate the grid on the host
     bool* h_grid = (bool*)malloc(gridSize * gridSize * sizeof(bool));
 
     // initialize the grid

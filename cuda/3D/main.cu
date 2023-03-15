@@ -26,10 +26,8 @@ __global__ void setup_kernel(curandState* state, int randomSeed) {
 // kernel to perform the dla algorithm
 __global__ void dla_kernel(bool* grid, curandState* state, int gridSize, int maxIterations) {
     // calculate thread id
-    int id = threadIdx.x + blockIdx.x * blockDim.x;
-
     // copy the random state to the local memory
-    curandState localState = state[id];
+    curandState localState = state[threadIdx.x + blockIdx.x * blockDim.x];
 
     // initialize the starting position of the particle
     int x;
@@ -221,12 +219,12 @@ int write_matrix_to_file(bool* matrix, int dim) {
 }
 
 // define the offsets for the 26 directions
-__device__ const int dx[26] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0,
-                               0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0};
-__device__ const int dy[26] = {-1, -1, -1, 0, 0, 0, 1, 1, 1, -1, -1, -1, 0,
-                               0, -1, -1, -1, 0, 0, 0, 1, 1, 1, 1, 1, 1};
-__device__ const int dz[26] = {-1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1,
-                               1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1};
+__constant__ int dx[26] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0,
+                           0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0};
+__constant__ int dy[26] = {-1, -1, -1, 0, 0, 0, 1, 1, 1, -1, -1, -1, 0,
+                           0, -1, -1, -1, 0, 0, 0, 1, 1, 1, 1, 1, 1};
+__constant__ int dz[26] = {-1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1,
+                           1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1};
 
 // move the particle in the random direction (out of 26)
 __device__ void move_particle(int* x, int* y, int* z, int m) {
@@ -236,8 +234,7 @@ __device__ void move_particle(int* x, int* y, int* z, int m) {
 }
 
 // copied from stackoverflow
-static __inline__ __device__ bool atomicCAS(bool* address, bool compare,
-                                            bool val) {
+static __inline__ __device__ bool atomicCAS(bool* address, bool compare, bool val) {
     unsigned long long addr = (unsigned long long)address;
     unsigned pos = addr & 3;             // byte position within the int
     int* int_addr = (int*)(addr - pos);  // int-aligned address
@@ -248,9 +245,8 @@ static __inline__ __device__ bool atomicCAS(bool* address, bool compare,
     do {
         current_value = (bool)(old & ((0xFFU) << (8 * pos)));
 
-        if (current_value !=
-            compare)  // If we expected that bool to be different, then
-            break;    // stop trying to update it and just return it's current value
+        if (current_value != compare)  // If we expected that bool to be different, then
+            break;                     // stop trying to update it and just return it's current value
 
         assumed = old;
         if (val)

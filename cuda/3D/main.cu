@@ -24,10 +24,17 @@ __global__ void setup_kernel(curandState* state, int randomSeed) {
 }
 
 // kernel to perform the dla algorithm
-__global__ void dla_kernel(bool* grid, curandState* state, int gridSize, int maxIterations) {
+__global__ void dla_kernel(cudaPitchedPtr d_grid, curandState* state, int gridSize, int maxIterations) {
     // calculate thread id
     // copy the random state to the local memory
     curandState localState = state[threadIdx.x + blockIdx.x * blockDim.x];
+
+    // get the pointer to the grid
+    bool* grid = (bool*)d_grid.ptr;
+    // get the pitch of the grid
+    size_t pitch = d_grid.pitch;
+    // calculate the slice pitch (a 2D slice of the 3D grid)
+    size_t slicePitch = d_grid.pitch * gridSize;
 
     // initialize the starting position of the particle
     int x;
@@ -42,7 +49,7 @@ __global__ void dla_kernel(bool* grid, curandState* state, int gridSize, int max
         x = curand(&localState) % gridSize;
         y = curand(&localState) % gridSize;
         z = curand(&localState) % gridSize;
-    } while (grid[x * gridSize * gridSize + y * gridSize + z] && g++ < maxIterations);
+    } while (grid[x * slicePitch + y * pitch + z] && g++ < maxIterations);
 
     // iterate until the particle is attached to the grid or it did more than
     // maxIterations number of iterations
@@ -56,10 +63,10 @@ __global__ void dla_kernel(bool* grid, curandState* state, int gridSize, int max
         for (int i = -1; i <= 1; i++)
             for (int j = -1; j <= 1; j++)
                 for (int k = -1; k <= 1; k++)
-                    if (grid[(x + k) * gridSize * gridSize + (y + j) * gridSize + (z + i)]) {
+                    if (grid[(x + k) * slicePitch + (y + j) * pitch + (z + i)]) {
                         // if the particle is close to an already stuck particle
                         // attach it to the grid
-                        atomicCAS(&grid[x * gridSize * gridSize + y * gridSize + z], 0, 1);
+                        atomicCAS(&grid[x * slicePitch + y * pitch + z], 0, 1);
                         return;
                     }
 
@@ -134,18 +141,30 @@ int main(int argc, char* argv[]) {
     // calculate the number of blocks
     int blocks = (numParticles + blockSize - 1) / blockSize;
 
-    // allocate the grid for both the host and the device
-    bool* grid;
-    cudaMallocManaged((void**)&grid, gridSize * gridSize * gridSize * sizeof(bool), cudaMemAttachGlobal);
+    // allocate the grid on the host
+    bool* h_grid = (bool*)malloc(gridSize * gridSize * gridSize * sizeof(bool));
 
     // initialize the grid
     for (int i = 0; i < gridSize; i++)
         for (int j = 0; j < gridSize; j++)
             for (int k = 0; k < gridSize; k++)
-                grid[i * gridSize * gridSize + j * gridSize + k] = 0;
+                h_grid[i * gridSize * gridSize + j * gridSize + k] = 0;
 
     // place the seed in si, sj
-    grid[si * gridSize * gridSize + sj * gridSize + sk] = 1;
+    h_grid[si * gridSize * gridSize + sj * gridSize + sk] = 1;
+
+    // allocate the grid in the device memory (aligned)
+    cudaExtent extent = make_cudaExtent(gridSize, gridSize, gridSize);
+    cudaPitchedPtr d_grid;
+    cudaMalloc3D(&d_grid, extent);
+
+    // copy the grid from the host to the device
+    cudaMemcpy3DParms copyParams = {0};
+    copyParams.srcPtr = make_cudaPitchedPtr((void*)h_grid, gridSize * sizeof(bool), gridSize, gridSize);
+    copyParams.dstPtr = d_grid;
+    copyParams.extent = extent;
+    copyParams.kind = cudaMemcpyHostToDevice;
+    cudaMemcpy3D(&copyParams);
 
     // allocate the array of the random states in the device memory
     curandState* d_state;
@@ -167,7 +186,7 @@ int main(int argc, char* argv[]) {
     cudaDeviceSynchronize();
 
     // launch the kernel to perform the dla algorithm
-    dla_kernel<<<blocks, blockSize>>>(grid, d_state, gridSize, maxIterations);
+    dla_kernel<<<blocks, blockSize>>>(d_grid, d_state, gridSize, maxIterations);
 
     // wait for the kernel to finish
     cudaDeviceSynchronize();
@@ -179,8 +198,16 @@ int main(int argc, char* argv[]) {
 
     printf("Simulation finished.\n\n");
 
+    // copy the grid from the device to the host
+    cudaMemcpy3DParms copyParams2 = {0};
+    copyParams2.srcPtr = d_grid;
+    copyParams2.dstPtr = make_cudaPitchedPtr((void*)h_grid, gridSize * sizeof(bool), gridSize, gridSize);
+    copyParams2.extent = extent;
+    copyParams2.kind = cudaMemcpyDeviceToHost;
+    cudaMemcpy3D(&copyParams2);
+
     // save the grid as a txt file and get the number of stuck particles
-    int stuck = write_matrix_to_file(grid, gridSize);
+    int stuck = write_matrix_to_file(h_grid, gridSize);
 
     // print the number of skipped particles
     printf("Of %d particles:\n - drawn %d,\n - skipped %d.\n\n", numParticles, stuck, numParticles - stuck);
@@ -189,7 +216,7 @@ int main(int argc, char* argv[]) {
     printf("Execution time in seconds: %f\n", time / 1000);
 
     // free the memory
-    cudaFree(grid);
+    cudaFree(h_grid);
     cudaFree(d_state);
 
     return 0;

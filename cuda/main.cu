@@ -28,10 +28,8 @@ __global__ void setup_kernel(curandState* state, int randomSeed) {
 // kernel to perform the diffusion
 __global__ void dla_kernel(bool* grid, curandState* state, int gridSize, int maxIterations) {
     // calculate thread id
-    int id = threadIdx.x + blockIdx.x * blockDim.x;
-
     // copy the random state to the local memory
-    curandState localState = state[id];
+    curandState localState = state[threadIdx.x + blockIdx.x * blockDim.x];
 
     // initialize the starting position of the particle
     int x;
@@ -55,6 +53,7 @@ __global__ void dla_kernel(bool* grid, curandState* state, int gridSize, int max
         y = min(max(y, 1), gridSize - 2);
 
         // if the particle is close to an already stuck particle
+        // TODO check only the new neighbors (2 less global memory access)
         if (grid[(x - 1) * gridSize + (y - 1)] ||  // top left
             grid[(x - 1) * gridSize + y] ||        // top
             grid[(x - 1) * gridSize + (y + 1)] ||  // top right
@@ -201,8 +200,8 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-__device__ const int dx[] = {-1, 0, 1, 1, 1, 0, -1, -1};
-__device__ const int dy[] = {-1, -1, -1, 0, 1, 1, 1, 0};
+__constant__ int dx[] = {-1, 0, 1, 1, 1, 0, -1, -1};
+__constant__ int dy[] = {-1, -1, -1, 0, 1, 1, 1, 0};
 
 // move the particle in the random direction
 __device__ void move_particle(int* x, int* y, int m) {

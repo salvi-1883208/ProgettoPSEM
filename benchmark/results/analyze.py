@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+# this code is bad, unoptimized and not very readable but it does what it needs to do
+
 # Import the CSV files
 serial_data = pd.read_csv("serial_results.csv", sep=" ")
 mpi_data = pd.read_csv("mpi_results.csv", sep=" ")
@@ -118,12 +120,16 @@ merged_serial_cuda["speedup"] = (
 # compute the number of blocks in a multiprocessor
 num_blocks = (2048 / merged_serial_cuda["num_process_cuda"]).round(decimals=0)
 
+# if the number of blocks is greater than the max number of blocks per multiprocessor
+# then set the number of blocks to the max
+num_blocks = num_blocks.where(num_blocks <= 32, 32)
+
 # compute the number of threads per multiprocessor
 num_threads = (num_blocks * merged_serial_cuda["num_process_cuda"]).round(decimals=0)
 
 # compute the efficiency
 merged_serial_cuda["efficiency"] = (
-    merged_serial_cuda["speedup"] / (num_threads * 20)
+    merged_serial_cuda["speedup"] / (num_threads * 20)  # 20 multiprocessors
 ).round(decimals=4)
 
 # Write the merged data to a new CSV file

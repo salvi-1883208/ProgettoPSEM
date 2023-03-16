@@ -30,7 +30,7 @@ The script takes as input the `csv` files and outputs two `csv` file with the fo
 
 | Size | Particles | Iterations | Num Processes|Time Serial | Time Parallel |  Speedup | Efficiency |
 |------|-----------|------------|--------------|------------|---------------|----------|------------|
-700|49000|100000|6,50|8853|26.6812|1.91|0.32
+700|49000|100000|6|50.8853|26.6812|1.91|0.32
 
 - The `Num Processes` column is the number of processes used to run the simulation: 
 	- In `merged_serial_cuda_results.csv` it is the size of the blocks of the kernel that computes the diffusion.

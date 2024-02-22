@@ -1,4 +1,4 @@
-# Parallel Diffusion-Limited Aggegation
+# Parallel Diffusion-Limited Aggregation
 
 There are three implementations of the Diffusion-Limited Aggregation algorithm: a serial one, a parallel one using MPI and a parallel one using CUDA.
 
